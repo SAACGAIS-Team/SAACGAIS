@@ -1,13 +1,24 @@
 import "@testing-library/jest-dom";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { AuthProvider } from "react-oidc-context";
 import Navbar from "./Navbar";
+
+const mockAuthConfig = {
+  authority: "https://example.com",
+  client_id: "test-client-id",
+  redirect_uri: "http://localhost:3000/callback",
+  response_type: "code",
+  scope: "openid profile email",
+};
 
 describe("Navbar component", () => {
   test("renders brand title and navigation buttons", () => {
     render(
       <MemoryRouter>
-        <Navbar />
+        <AuthProvider {...mockAuthConfig}>
+          <Navbar />
+        </AuthProvider>
       </MemoryRouter>
     );
 
