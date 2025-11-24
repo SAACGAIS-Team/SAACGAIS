@@ -1,0 +1,45 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lang: [python, node]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.lang == 'python'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Python deps
+        if: matrix.lang == 'python'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov ruff bandit pip-audit
+      - name: Python lint + test + security
+        if: matrix.lang == 'python'
+        run: |
+          ruff check .
+          pytest --maxfail=1 --disable-warnings --cov=.
+          bandit -q -r .
+          pip-audit
+
+      - name: Set up Node
+        if: matrix.lang == 'node'
+        uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Node deps
+        if: matrix.lang == 'node'
+        run: npm ci
+      - name: Node lint + test + audit
+        if: matrix.lang == 'node'
+        run: |
+          npm run lint
+          npm test -- --watchAll=false
+          npm audit --audit-level=high
