@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from "react-oidc-context";
 
 function Home() {
   const [testRows, setTestRows] = useState([]);
+  const auth = useAuth();
 
   const API_BASE = 'http://localhost:5000';
 
@@ -10,7 +12,11 @@ function Home() {
       .then(res => res.json())
       .then(data => setTestRows(data))
       .catch(err => console.error("Error fetching test rows:", err));
-  }, []);
+
+      // if (!auth.isLoading && auth.user) {
+      //   console.log("Groups:", auth.user.profile["cognito:groups"]);
+      // }
+  }, [auth.isLoading, auth.user]);
 
   const addRow = async () => {
     try {

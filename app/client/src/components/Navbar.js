@@ -6,11 +6,14 @@ import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
 import { Link } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
+import { useNavigate } from "react-router-dom";
 
 export default function Navbar() {
   const auth = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
+    navigate("/");
     const clientId = "7lua5mn5k5i6cffirttl5qa5b";
     const logoutUri = "http://localhost:3000/";
     const cognitoDomain = "https://us-east-2c7yjbxcu3.auth.us-east-2.amazoncognito.com";
