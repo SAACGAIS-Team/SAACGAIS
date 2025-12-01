@@ -8,7 +8,7 @@ import Upload from "./pages/Upload.js";
 import About from "./pages/About.js";
 import Callback from "./pages/Callback.js";
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedGroups = [] }) {
   const auth = useAuth();
   const location = useLocation();
 
@@ -21,10 +21,15 @@ function ProtectedRoute({ children }) {
   }
 
   if (!auth.isAuthenticated) {
-    auth.signinRedirect({
-      state: { from: location.pathname },
-    });
+    auth.signinRedirect({ state: { from: location.pathname } });
     return <div>Redirecting to sign in...</div>;
+  }
+
+  const userGroups = auth.user?.profile?.["cognito:groups"] || [];
+  const isAllowed = allowedGroups.length === 0 || userGroups.some((g) => allowedGroups.includes(g));
+
+  if (!isAllowed) {
+    return <div>You do not have permission to view this page.</div>;
   }
 
   return children;
@@ -32,6 +37,7 @@ function ProtectedRoute({ children }) {
 
 ProtectedRoute.propTypes = {
   children: PropTypes.node.isRequired,
+  allowedGroups: PropTypes.arrayOf(PropTypes.string),
 };
 
 function App() {
@@ -46,7 +52,7 @@ function App() {
         <Route
           path="/upload"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedGroups={["Administrator", "Patient"]}>
               <Upload />
             </ProtectedRoute>
           }

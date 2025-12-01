@@ -1,21 +1,26 @@
 import React, { useState } from "react";
-import MessageInput from "../components/MessageInput.js";
+import { Box, Button, Typography, Paper, TextField, CircularProgress } from "@mui/material";
 
 function Upload() {
   const [aiReply, setAiReply] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [userMessage, setUserMessage] = useState("");
 
-  const handleSendMessage = async (text) => {
-    setAiReply("");    
+  const handleSend = async () => {
+    if (!userMessage && !selectedFile) return;
+
+    setAiReply("");
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/ai/chat", {
+      const formData = new FormData();
+      formData.append("userMessage", userMessage);
+      if (selectedFile) formData.append("file", selectedFile);
+
+      const response = await fetch("http://localhost:5000/api/ai/upload", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userMessage: text }),
+        body: formData,
       });
 
       const data = await response.json();
@@ -23,37 +28,78 @@ function Upload() {
       if (response.ok) {
         setAiReply(data.reply);
       } else {
-        console.error("API error:", data.error);
         setAiReply("Error: " + data.error);
       }
     } catch (err) {
-      console.error("Network error:", err);
       setAiReply("Network error: " + err.message);
     } finally {
       setLoading(false);
+      setUserMessage("");
+      setSelectedFile(null);
     }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Upload Documents</h1>
-      <p>Uploading documents and other information will be done here.</p>
+    <Box sx={{ padding: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Upload Documents & Send Message
+      </Typography>
 
-      <div style={{ marginTop: "20px" }}>
-        <h2>Send a Message</h2>
-        <MessageInput onSend={handleSendMessage} />
-        {!loading && aiReply && (
-          <div style={{ marginTop: "10px", padding: "10px", border: "1px solid #ccc" }}>
-            <strong>AI Reply:</strong> {aiReply}
-          </div>
-        )}
-        {loading && (
-          <div style={{ marginTop: "10px", padding: "10px", border: "1px solid #ccc" }}>
-            <strong>Loading...</strong>
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Large Text Box */}
+      <TextField
+        label="Message to AI"
+        multiline
+        minRows={6}
+        maxRows={12}
+        variant="outlined"
+        fullWidth
+        value={userMessage}
+        onChange={(e) => setUserMessage(e.target.value)}
+        sx={{ mb: 2 }}
+      />
+
+      {/* File Upload */}
+      <input
+        type="file"
+        id="file-upload"
+        style={{ display: "none" }}
+        onChange={(e) => setSelectedFile(e.target.files[0])}
+      />
+      <label htmlFor="file-upload">
+        <Button variant="contained" component="span" color="primary" sx={{ mb: 2 }}>
+          {selectedFile ? "Change File" : "Choose File"}
+        </Button>
+      </label>
+      {selectedFile && (
+        <Paper sx={{ mt: 1, p: 1, backgroundColor: "#f5f5f5" }}>
+          Selected file: {selectedFile.name}
+        </Paper>
+      )}
+
+      {/* Send Button */}
+      <Box sx={{ mt: 2 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSend}
+          disabled={loading || (!userMessage && !selectedFile)}
+        >
+          Send to AI
+        </Button>
+      </Box>
+
+      {/* AI Reply */}
+      {loading && (
+        <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
+          <CircularProgress color="primary" />
+        </Paper>
+      )}
+      {!loading && aiReply && (
+        <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
+          <strong>AI Reply:</strong> {aiReply}
+        </Paper>
+      )}
+    </Box>
   );
 }
 

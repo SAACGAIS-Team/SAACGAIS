@@ -3,21 +3,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Upload from "./Upload";
 
-// Mock the MessageInput component
-jest.mock("../components/MessageInput.js", () => (props) => {
-  return (
-    <div>
-      <input
-        aria-label="Type a message"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") props.onSend(e.target.value);
-        }}
-      />
-      <button onClick={() => props.onSend("Test message")}>Send</button>
-    </div>
-  );
-});
-
 describe("Upload component", () => {
   beforeEach(() => {
     global.fetch = jest.fn();
@@ -29,12 +14,10 @@ describe("Upload component", () => {
 
   test("renders heading and description", () => {
     render(<Upload />);
-    expect(screen.getByText("Upload Documents")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Uploading documents and other information will be done here."
-      )
+      screen.getByText(/Upload Documents & Send Message/i)
     ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Message to AI/i)).toBeInTheDocument();
   });
 
   test("displays AI reply after sending a message", async () => {
@@ -46,18 +29,26 @@ describe("Upload component", () => {
 
     render(<Upload />);
 
-    const input = screen.getByLabelText("Type a message");
-    fireEvent.keyDown(input, { key: "Enter", code: "Enter", target: { value: "Hi AI" } });
+    // Enter a message
+    const input = screen.getByLabelText(/Message to AI/i);
+    fireEvent.change(input, { target: { value: "Hi AI" } });
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    // Click the Send button
+    const sendButton = screen.getByRole("button", { name: /Send to AI/i });
+    fireEvent.click(sendButton);
 
+    // Loading indicator should appear
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+
+    // Wait for AI reply
     await waitFor(() =>
       expect(
         screen.getByText((content) => content.includes("Hello from AI!"))
       ).toBeInTheDocument()
     );
 
-    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    // Loading indicator should disappear
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   test("displays error if API fails", async () => {
@@ -68,12 +59,17 @@ describe("Upload component", () => {
 
     render(<Upload />);
 
-    const input = screen.getByLabelText("Type a message");
-    fireEvent.keyDown(input, { key: "Enter", code: "Enter", target: { value: "Hi AI" } });
+    const input = screen.getByLabelText(/Message to AI/i);
+    fireEvent.change(input, { target: { value: "Hi AI" } });
+
+    const sendButton = screen.getByRole("button", { name: /Send to AI/i });
+    fireEvent.click(sendButton);
 
     await waitFor(() =>
       expect(
-        screen.getByText((content) => content.includes("Error: Something went wrong"))
+        screen.getByText((content) =>
+          content.includes("Error: Something went wrong")
+        )
       ).toBeInTheDocument()
     );
   });
@@ -83,13 +79,37 @@ describe("Upload component", () => {
 
     render(<Upload />);
 
-    const input = screen.getByLabelText("Type a message");
-    fireEvent.keyDown(input, { key: "Enter", code: "Enter", target: { value: "Hi AI" } });
+    const input = screen.getByLabelText(/Message to AI/i);
+    fireEvent.change(input, { target: { value: "Hi AI" } });
+
+    const sendButton = screen.getByRole("button", { name: /Send to AI/i });
+    fireEvent.click(sendButton);
 
     await waitFor(() =>
       expect(
-        screen.getByText((content) => content.includes("Network error: Network failure"))
+        screen.getByText((content) =>
+          content.includes("Network error: Network failure")
+        )
       ).toBeInTheDocument()
     );
+  });
+
+  test("can select a file and display its name", () => {
+    render(<Upload />);
+
+    const file = new File(["dummy content"], "example.txt", {
+      type: "text/plain",
+    });
+
+    const fileInput = screen.getByLabelText(/Choose File/i);
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    expect(screen.getByText(/Selected file: example.txt/i)).toBeInTheDocument();
+  });
+
+  test("send button disabled when no message or file", () => {
+    render(<Upload />);
+    const sendButton = screen.getByRole("button", { name: /Send to AI/i });
+    expect(sendButton).toBeDisabled();
   });
 });
