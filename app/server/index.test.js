@@ -1,5 +1,17 @@
 import request from 'supertest';
 
+// Mock Supabase BEFORE any imports that use it
+jest.mock('./db.js', () => ({
+  supabase: {
+    from: jest.fn(() => ({
+      select: jest.fn(() => Promise.resolve({ data: [], error: null })),
+      insert: jest.fn(() => Promise.resolve({ data: [], error: null })),
+      update: jest.fn(() => Promise.resolve({ data: [], error: null })),
+      delete: jest.fn(() => Promise.resolve({ data: [], error: null })),
+    })),
+  },
+}));
+
 // Mock the Cognito configuration BEFORE importing the app
 jest.mock('./config/cognito.js', () => ({
   cognito: {
