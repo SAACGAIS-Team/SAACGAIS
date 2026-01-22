@@ -1,82 +1,102 @@
-import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import { render, screen } from "@testing-library/react";
 import Home from "./Home";
 
-beforeEach(() => {
-  global.fetch = jest.fn();
-});
+// Mock useAuth hook
+jest.mock("react-oidc-context", () => ({
+  useAuth: jest.fn(),
+}));
 
-afterEach(() => {
-  jest.resetAllMocks();
-});
+const { useAuth } = require("react-oidc-context");
 
 describe("Home component", () => {
-  test("renders heading, description, and no rows initially", async () => {
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
-
-    render(<Home />);
-
-    expect(screen.getByText("Welcome to SAACGAIS")).toBeInTheDocument();
-    expect(screen.getByText("This is the home page.")).toBeInTheDocument();
-
-    await waitFor(() =>
-      expect(screen.getByText("No rows found.")).toBeInTheDocument()
-    );
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  test("renders rows from API", async () => {
-    const mockRows = [
-      { test_id: 1, test: "Row 1" },
-      { test_id: 2, test: "Row 2" },
-    ];
-
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockRows,
+  test("renders heading and welcome message", () => {
+    useAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: {
+        profile: {
+          email: "test@example.com",
+          "cognito:groups": ["User", "Admin"]
+        }
+      },
     });
 
     render(<Home />);
 
-    for (const row of mockRows) {
-      await waitFor(() =>
-        expect(screen.getByText(`${row.test_id}: ${row.test}`)).toBeInTheDocument()
-      );
-    }
+    const heading = screen.getByText(/Welcome to SAACGAIS/i);
+    expect(heading).toBeInTheDocument();
   });
 
-  test("adds a new row when button is clicked", async () => {
-    const initialRows = [{ test_id: 1, test: "Existing row" }];
-    const newRow = { test_id: 2, test: "Hello from React!" };
-
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => initialRows,
+  test("displays user roles when authenticated and has roles", () => {
+    useAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: {
+        profile: {
+          email: "test@example.com",
+          "cognito:groups": ["User", "Admin"]
+        }
+      },
     });
 
     render(<Home />);
 
-    await waitFor(() =>
-      expect(screen.getByText("1: Existing row")).toBeInTheDocument()
-    );
+    const rolesText = screen.getByText(/You are assigned the following roles:/i);
+    expect(rolesText).toBeInTheDocument();
 
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => newRow,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [...initialRows, newRow],
-      });
+    const userChip = screen.getByText("User");
+    expect(userChip).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Add New Row"));
+    const adminChip = screen.getByText("Admin");
+    expect(adminChip).toBeInTheDocument();
+  });
 
-    await waitFor(() =>
-      expect(screen.getByText("2: Hello from React!")).toBeInTheDocument()
-    );
+  test("displays message when authenticated but has no roles", () => {
+    useAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: {
+        profile: {
+          email: "test@example.com",
+          "cognito:groups": []
+        }
+      },
+    });
+
+    render(<Home />);
+
+    const noRolesText = screen.getByText(/You are not assigned to any roles/i);
+    expect(noRolesText).toBeInTheDocument();
+  });
+
+  test("displays message when not authenticated", () => {
+    useAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+    });
+
+    render(<Home />);
+
+    const notLoggedInText = screen.getByText(/You are not logged in/i);
+    expect(notLoggedInText).toBeInTheDocument();
+  });
+
+  test("handles missing cognito:groups gracefully", () => {
+    useAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: {
+        profile: {
+          email: "test@example.com",
+          // No cognito:groups property
+        }
+      },
+    });
+
+    render(<Home />);
+
+    const noRolesText = screen.getByText(/You are not assigned to any roles/i);
+    expect(noRolesText).toBeInTheDocument();
   });
 });

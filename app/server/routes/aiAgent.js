@@ -8,11 +8,6 @@ const router = express.Router();
 
 const client = new BedrockAgentRuntimeClient({
   region: process.env.AWS_REGION || "us-east-2",
-  // credentials: {
-  //   accessKeyId: process.env.AWS_BEDROCK_API_KEY,  // Use the Bedrock API key
-  //   secretAccessKey: "bedrock-api-key",         // This is ignored but required
-  // },
-  // OR, if the above doesn't work, use this:
   customUserAgent: `bedrock-api-key/${process.env.BEDROCK_API_KEY}`,
 });
 

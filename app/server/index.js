@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import cors from "cors";
-
 import express from "express";
 import healthRoutes from "./routes/health.js";
 import bedrockRoute from "./routes/aiAgent.js";
@@ -21,6 +20,10 @@ app.use("/api/search-users", searchUsersRoute);
 app.use("/api/provider", providerRoute);
 app.use("/api/user-roles", userRolesRoute);
 
-app.listen(3001, () => {
-  console.log("Server running on port 3001");
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(3001, () => {
+    console.log("Server running on port 3001");
+  });
+}
+
+export default app;
