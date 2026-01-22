@@ -1,19 +1,26 @@
-import express from 'express';
-import cors from 'cors';
-import testRoutes from './routes/_test.js';
-import bedrockRoute from './routes/aiAgent.js';
+import dotenv from "dotenv";
+dotenv.config();
+
+import cors from "cors";
+
+import express from "express";
+import healthRoutes from "./routes/health.js";
+import bedrockRoute from "./routes/aiAgent.js";
+import searchUsersRoute from "./routes/searchUsers.js";
+import providerRoute from "./routes/provider.js";
+import userRolesRoute from "./routes/userRoles.js";
 
 const app = express();
-
-app.use(cors());
 app.use(express.json());
 
-app.use('/test', testRoutes);
-app.use('/api/ai', bedrockRoute);
+app.use(cors({ origin: "http://localhost:3000" }));
 
-if (process.env.NODE_ENV !== 'test') {
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-}
+app.use("/api/health", healthRoutes);
+app.use("/api/ai", bedrockRoute);
+app.use("/api/search-users", searchUsersRoute);
+app.use("/api/provider", providerRoute);
+app.use("/api/user-roles", userRolesRoute);
 
-export default app;
+app.listen(3001, () => {
+  console.log("Server running on port 3001");
+});

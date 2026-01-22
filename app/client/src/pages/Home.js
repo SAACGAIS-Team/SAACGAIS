@@ -1,56 +1,47 @@
-import React, { useEffect, useState } from "react";
+import { Typography, Box, Chip } from "@mui/material";
+import { useEffect, useState } from "react";
+import { useAuth } from "react-oidc-context";
 
 function Home() {
-  const [testRows, setTestRows] = useState([]);
-
-  const API_BASE = 'http://localhost:5000';
+  const auth = useAuth();
+  const [userGroups, setUserGroups] = useState([]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/test`)
-      .then(res => res.json())
-      .then(data => setTestRows(data))
-      .catch(err => console.error("Error fetching test rows:", err));
-  }, []);
-
-  const addRow = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test: 'Hello from React!' })
-      });
-      const data = await res.json();
-      console.log("Inserted row:", data);
-
-      // Refresh
-      const updated = await fetch(`${API_BASE}/test`).then(res => res.json());
-      setTestRows(updated);
-    } catch (err) {
-      console.error("Error adding row:", err);
-    }
-  };
-
+    setUserGroups(auth.user?.profile?.["cognito:groups"] || []);
+  }, [auth.user]);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Welcome to SAACGAIS</h1>
-      <p>This is the home page.</p>
+    <Box sx={{ p: 4, maxWidth: 800}}>
+      <Typography variant="h3" sx={{ mb: 2, fontWeight: "bold" }}>
+        Welcome to SAACGAIS
+      </Typography>
 
-      <button onClick={addRow}>Add New Row</button>
+      {auth.isAuthenticated ? (
+        <>
+          {userGroups.length > 0 ? (
+            <>
+              <Typography variant="body1" component="p" sx={{ mb: 1, color: "text.secondary" }}>
+                You are assigned the following roles:
+              </Typography>
 
-      <h2>Test Table Rows:</h2>
-      {testRows.length === 0 ? (
-        <p>No rows found.</p>
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {userGroups.map((role) => (
+                  <Chip key={role} label={role} color="primary" variant="outlined" />
+                ))}
+              </Box>
+            </>
+          ) : (
+            <Typography variant="body1" component="p" sx={{ mb: 1, color: "text.secondary" }}>
+              You are not assigned to any roles
+            </Typography>
+          )}
+        </>
       ) : (
-        <ul>
-          {testRows.map((row) => (
-            <li key={row.test_id}>
-              {row.test_id}: {row.test}
-            </li>
-          ))}
-        </ul>
+        <Typography variant="body1" component="p" sx={{ color: "text.secondary" }}>
+          You are not logged in
+        </Typography>
       )}
-    </div>
+    </Box>
   );
 }
 
