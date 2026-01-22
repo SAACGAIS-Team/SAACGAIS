@@ -5,6 +5,8 @@ import { useAuth } from "react-oidc-context";
 import Navbar from "./components/Navbar.js";
 import Home from "./pages/Home.js";
 import Upload from "./pages/Upload.js";
+import SelectProvider from "./pages/SelectProvider.js";
+import ChangeRole from "./pages/ChangeRole.js";
 import About from "./pages/About.js";
 import Callback from "./pages/Callback.js";
 
@@ -49,14 +51,34 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
+
         <Route
           path="/upload"
           element={
-            <ProtectedRoute allowedGroups={["Administrator", "Patient"]}>
+            <ProtectedRoute allowedGroups={["Patient"]}>
               <Upload />
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/select-provider"
+          element={
+            <ProtectedRoute allowedGroups={["Patient"]}>
+              <SelectProvider />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/change-role"
+          element={
+            <ProtectedRoute allowedGroups={["Administrator"]}>
+              <ChangeRole />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="/about" element={<About />} />
 
         <Route path="/callback" element={<Callback />} />

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "jest --ci",
+    "test": "cross-env NODE_ENV=test jest --ci",
     "lint": "npx eslint ."
   },
   "keywords": [],
@@ -15,6 +15,8 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.927.0",
     "@aws-sdk/client-bedrock-runtime": "^3.927.0",
+    "@supabase/supabase-js": "^2.90.1",
+    "aws-sdk": "^2.1693.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
@@ -27,6 +29,7 @@
     "@babel/preset-env": "^7.28.5",
     "@eslint/eslintrc": "^3.3.1",
     "babel-jest": "^30.2.0",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react": "^7.37.5",
     "jest": "^30.2.0",

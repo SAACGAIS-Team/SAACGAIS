@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Button, Typography, Paper, TextField, CircularProgress } from "@mui/material";
 
 function Upload() {
@@ -18,7 +18,7 @@ function Upload() {
       formData.append("userMessage", userMessage);
       if (selectedFile) formData.append("file", selectedFile);
 
-      const response = await fetch("http://localhost:5000/api/ai/upload", {
+      const response = await fetch("http://localhost:3001/api/ai/upload", {
         method: "POST",
         body: formData,
       });
@@ -89,16 +89,18 @@ function Upload() {
       </Box>
 
       {/* AI Reply */}
-      {loading && (
-        <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
-          <CircularProgress color="primary" />
-        </Paper>
-      )}
-      {!loading && aiReply && (
-        <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
-          <strong>AI Reply:</strong> {aiReply}
-        </Paper>
-      )}
+      <Box sx={{ minHeight: 300 }}>
+        {loading && (
+          <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
+            <CircularProgress color="primary" />
+          </Paper>
+        )}
+        {!loading && aiReply && (
+          <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
+            <strong>AI Reply:</strong> {aiReply}
+          </Paper>
+        )}
+      </Box>
     </Box>
   );
 }

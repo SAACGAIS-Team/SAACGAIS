@@ -1,11 +1,15 @@
-import React from "react";
+import { Box, Typography } from "@mui/material";
 
 function About() {
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>About Our Project</h1>
-      <p>Information about the project goes here.</p>
-    </div>
+    <Box sx={{ padding: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        About Our Project
+      </Typography>
+      <Typography variant="body1">
+        Information about the project goes here.
+      </Typography>
+    </Box>
   );
 }
 

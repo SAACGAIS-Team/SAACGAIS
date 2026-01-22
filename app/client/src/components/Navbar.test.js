@@ -29,15 +29,12 @@ describe("Navbar component", () => {
 
     // Navigation links (MUI Button with component={Link} becomes <a>)
     const homeLink = screen.getByRole("link", { name: "Home" });
-    const uploadLink = screen.getByRole("link", { name: "Upload" });
     const aboutLink = screen.getByRole("link", { name: "About" });
 
     expect(homeLink).toBeInTheDocument();
-    expect(uploadLink).toBeInTheDocument();
     expect(aboutLink).toBeInTheDocument();
 
     expect(homeLink).toHaveAttribute("href", "/");
-    expect(uploadLink).toHaveAttribute("href", "/upload");
     expect(aboutLink).toHaveAttribute("href", "/about");
   });
 });

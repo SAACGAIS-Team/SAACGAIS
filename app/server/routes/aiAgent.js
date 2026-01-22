@@ -7,7 +7,8 @@ dotenv.config();
 const router = express.Router();
 
 const client = new BedrockAgentRuntimeClient({
-  region: process.env.AWS_REGION || "us-west-2",
+  region: process.env.AWS_REGION || "us-east-2",
+  customUserAgent: `bedrock-api-key/${process.env.BEDROCK_API_KEY}`,
 });
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -28,7 +29,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const command = new InvokeAgentCommand({
       agentId: process.env.AWS_AGENT_ID,
       agentAliasId: process.env.AWS_AGENT_ALIAS_ID,
-      sessionId: "local-session-1",
+      sessionId: `session-${Date.now()}`,
       inputText: combinedInput,
     });
 

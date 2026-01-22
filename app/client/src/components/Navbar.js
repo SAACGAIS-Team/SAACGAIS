@@ -1,24 +1,49 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
-import { useNavigate } from "react-router-dom";
+import { cognitoAuthConfig } from "../cognitoAuthConfig.js";
+import { listenForRoleUpdates } from "../utils/roleUpdateEvent.js";
 
 export default function Navbar() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const [userGroups, setUserGroups] = useState([]);
+  
+  useEffect(() => {
+    setUserGroups(auth.user?.profile?.["cognito:groups"] || []);
+  }, [auth.user]);
 
-  const handleLogout = () => {
+  // Listen for role update events
+  useEffect(() => {
+    const handleRoleUpdate = async () => {
+      console.log("Role update detected, refreshing token...");
+      try {
+        await auth.signinSilent();
+      } catch (err) {
+        console.error("Error refreshing token:", err);
+      }
+    };
+
+    const cleanup = listenForRoleUpdates(handleRoleUpdate);
+    return cleanup;
+  }, [auth]);
+
+  const handleLogout = async () => {
     navigate("/");
-    const clientId = "7lua5mn5k5i6cffirttl5qa5b";
-    const logoutUri = "http://localhost:3000/";
-    const cognitoDomain = "https://us-east-2c7yjbxcu3.auth.us-east-2.amazoncognito.com";
-    auth.removeUser();
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+    const clientId = cognitoAuthConfig.client_id;
+    const logoutUri = encodeURIComponent(cognitoAuthConfig.post_logout_redirect_uri);
+    const cognitoDomain = "https://us-east-2syjjxolri.auth.us-east-2.amazoncognito.com";
+    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${logoutUri}`;
+    await auth.removeUser();
+  };
+
+  const handleLogin = () => {
+    auth.signinRedirect();
   };
 
   return (
@@ -42,13 +67,29 @@ export default function Navbar() {
           <Button color="inherit" component={Link} to="/" sx={{ color: "white" }}>
             Home
           </Button>
-          <Button color="inherit" component={Link} to="/upload" sx={{ color: "white" }}>
-            Upload
-          </Button>
+
+          {(userGroups.includes("Patient")) && (
+            <Button color="inherit" component={Link} to="/upload" sx={{ color: "white" }}>
+              Upload
+            </Button>
+          )}
+          
+          {(userGroups.includes("Patient")) && (
+            <Button color="inherit" component={Link} to="/select-provider" sx={{ color: "white" }}>
+              Select Provider
+            </Button>
+          )}
+
+          {(userGroups.includes("Administrator")) && (
+            <Button color="inherit" component={Link} to="/change-role" sx={{ color: "white" }}>
+              Change Role
+            </Button>
+          )}
+
           <Button color="inherit" component={Link} to="/about" sx={{ color: "white" }}>
             About
           </Button>
-
+          
           {auth.isAuthenticated ? (
             <>
               <Typography
@@ -68,7 +109,7 @@ export default function Navbar() {
               </Button>
             </>
           ) : (
-            <Button color="inherit" sx={{ color: "white" }} onClick={() => auth.signinRedirect()}>
+            <Button color="inherit" sx={{ color: "white" }} onClick={handleLogin}>
               Login
             </Button>
           )}
