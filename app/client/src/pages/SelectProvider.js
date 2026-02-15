@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Box, TextField, Button, Typography, CircularProgress, Autocomplete, Alert } from "@mui/material";
 import { useAuth } from "react-oidc-context";
+import { providerService, userService } from "../api.js";
 
 function SelectProvider() {
     const [open, setOpen] = useState(false);
@@ -36,29 +37,12 @@ function SelectProvider() {
                     return;
                 }
 
-                // Get provider UID from database
-                const res = await fetch(
-                    `http://localhost:3001/api/provider?user=${encodeURIComponent(userId)}`, 
-                    { signal: controller.signal }
-                );
-                
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                
-                const response = await res.json();
+                // Get provider UID from database using service
+                const response = await providerService.getByUserId(userId);
                 
                 if (response.ok && response.data && response.data.Provider_UID) {
-                    const providerRes = await fetch(
-                        `http://localhost:3001/api/search-users/${response.data.Provider_UID}`,
-                        { signal: controller.signal }
-                    );
-                    
-                    if (!providerRes.ok) {
-                        throw new Error(`HTTP error! status: ${providerRes.status}`);
-                    }
-                    
-                    const providerInfo = await providerRes.json();
+                    // Get provider info using service
+                    const providerInfo = await userService.getUserById(response.data.Provider_UID);
                     
                     setCurrentProvider({
                         ...providerInfo,
@@ -89,11 +73,9 @@ function SelectProvider() {
         const timeout = setTimeout(async () => {
             try {
                 setLoading(true);
-                const res = await fetch(
-                    `http://localhost:3001/api/search-users?role=Healthcare-Provider&search=${encodeURIComponent(input)}`, 
-                    { signal: controller.signal }
-                );
-                setOptions(await res.json());
+                // Use service to search users by role
+                const data = await userService.searchUsersByRole("Healthcare-Provider", input);
+                setOptions(data);
             } catch (e) {
                 if (e.name !== "AbortError") console.error(e);
             } finally {
@@ -118,22 +100,12 @@ function SelectProvider() {
                 return;
             }
 
-            const res = await fetch("http://localhost:3001/api/provider", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    userId: userId,
-                    providerId: selected.sub,
-                }),
+            // Use service to select provider
+            // IMPORTANT: userId should be removed - backend gets from Cognito token
+            await providerService.selectProvider({
+                userId: userId,  // TODO: Remove this - backend should use req.user.sub
+                providerId: selected.sub,
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || "Failed to set provider");
-            }
 
             setMessage({ type: "success", text: "Provider updated successfully!" });
             
@@ -147,7 +119,10 @@ function SelectProvider() {
             setInput("");
         } catch (err) {
             console.error("Error setting provider:", err);
-            setMessage({ type: "error", text: err.message });
+            setMessage({ 
+                type: "error", 
+                text: err.response?.data?.error || err.message 
+            });
         } finally {
             setSubmitting(false);
         }

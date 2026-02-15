@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Box, TextField, Button, Typography, CircularProgress, Autocomplete, Alert, FormControl, InputLabel, Select, MenuItem, Chip, OutlinedInput } from "@mui/material";
 import { useAuth } from "react-oidc-context";
 import { triggerRoleUpdate } from "../utils/roleUpdateEvent.js";
+import { userService } from "../api.js";
 
 function ChangeRole() {
     const [open, setOpen] = useState(false);
@@ -20,8 +21,7 @@ function ChangeRole() {
     useEffect(() => {
         const fetchAvailableRoles = async () => {
             try {
-                const res = await fetch("http://localhost:3001/api/user-roles");
-                const data = await res.json();
+                const data = await userService.getUserRoles();
                 setRoles(data.roles.map(r => r.name));
             } catch (err) {
                 console.error("Error fetching roles:", err);
@@ -42,11 +42,8 @@ function ChangeRole() {
         const timeout = setTimeout(async () => {
             try {
                 setLoading(true);
-                const res = await fetch(
-                    `http://localhost:3001/api/search-users?search=${encodeURIComponent(input)}`, 
-                    { signal: controller.signal }
-                );
-                setOptions(await res.json());
+                const data = await userService.searchUsers(input);
+                setOptions(data);
             } catch (e) {
                 if (e.name !== "AbortError") console.error(e);
             } finally {
@@ -67,15 +64,7 @@ function ChangeRole() {
         const fetchUserRoles = async () => {
             try {
                 setLoadingRoles(true);
-                const res = await fetch(
-                    `http://localhost:3001/api/user-roles/${selected.sub}`
-                );
-                
-                if (!res.ok) {
-                    throw new Error("Failed to fetch user roles");
-                }
-                
-                const data = await res.json();
+                const data = await userService.getUserRolesById(selected.sub);
                 setCurrentRoles(data.roles || []);
                 setSelectedRoles(data.roles || []);
             } catch (err) {
@@ -104,24 +93,6 @@ function ChangeRole() {
                 return;
             }
 
-            const res = await fetch("http://localhost:3001/api/user-roles", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    adminUserId: userId,
-                    targetUserId: selected.sub,
-                    newRoles: selectedRoles,
-                }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || "Failed to change roles");
-            }
-
             // Update current roles to show the change immediately
             setCurrentRoles(selectedRoles);
             
@@ -135,7 +106,6 @@ function ChangeRole() {
             const isCurrentUser = selected.sub === userId;
             if (isCurrentUser) {
                 console.log("Updated current user's roles, triggering token refresh...");
-                // Trigger after a short delay so success message shows first
                 setTimeout(() => {
                     triggerRoleUpdate(selected.sub);
                 }, 100);
@@ -145,7 +115,7 @@ function ChangeRole() {
             
         } catch (err) {
             console.error("Error changing roles:", err);
-            setMessage({ type: "error", text: err.message });
+            setMessage({ type: "error", text: err.response?.data?.error || err.message });
         } finally {
             setSubmitting(false);
         }
