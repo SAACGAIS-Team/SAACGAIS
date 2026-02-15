@@ -3,13 +3,18 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import Upload from "./Upload";
 
+// Mock the api module
+jest.mock("../api.js", () => ({
+  aiService: {
+    uploadFile: jest.fn(),
+  },
+}));
+
+import { aiService } from "../api.js";
+
 describe("Upload component", () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
-  });
-
-  afterEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
   });
 
   test("renders heading and description", () => {
@@ -22,10 +27,7 @@ describe("Upload component", () => {
 
   test("displays AI reply after sending a message", async () => {
     const mockReply = { reply: "Hello from AI!" };
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockReply,
-    });
+    aiService.uploadFile.mockResolvedValueOnce(mockReply);
 
     render(<Upload />);
 
@@ -52,10 +54,9 @@ describe("Upload component", () => {
   });
 
   test("displays error if API fails", async () => {
-    fetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ error: "Something went wrong" }),
-    });
+    const error = new Error("Something went wrong");
+    error.response = { data: { error: "Something went wrong" } };
+    aiService.uploadFile.mockRejectedValueOnce(error);
 
     render(<Upload />);
 
@@ -75,7 +76,7 @@ describe("Upload component", () => {
   });
 
   test("displays network error if fetch fails", async () => {
-    fetch.mockRejectedValueOnce(new Error("Network failure"));
+    aiService.uploadFile.mockRejectedValueOnce(new Error("Network failure"));
 
     render(<Upload />);
 
@@ -88,7 +89,7 @@ describe("Upload component", () => {
     await waitFor(() =>
       expect(
         screen.getByText((content) =>
-          content.includes("Network error: Network failure")
+          content.includes("Error: Network failure")
         )
       ).toBeInTheDocument()
     );
@@ -101,7 +102,7 @@ describe("Upload component", () => {
       type: "text/plain",
     });
 
-    const fileInput = screen.getByLabelText(/Choose File/i);
+    const fileInput = document.getElementById("file-upload");
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     expect(screen.getByText(/Selected file: example.txt/i)).toBeInTheDocument();
