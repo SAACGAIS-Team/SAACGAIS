@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Box, Button, Typography, Paper, TextField, CircularProgress } from "@mui/material";
+import { aiService } from "../api.js";
 
 function Upload() {
   const [aiReply, setAiReply] = useState("");
@@ -14,24 +15,10 @@ function Upload() {
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("userMessage", userMessage);
-      if (selectedFile) formData.append("file", selectedFile);
-
-      const response = await fetch("http://localhost:3001/api/ai/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setAiReply(data.reply);
-      } else {
-        setAiReply("Error: " + data.error);
-      }
+      const data = await aiService.uploadFile(userMessage, selectedFile);
+      setAiReply(data.reply);
     } catch (err) {
-      setAiReply("Network error: " + err.message);
+      setAiReply("Error: " + (err.response?.data?.error || err.message));
     } finally {
       setLoading(false);
       setUserMessage("");
