@@ -3,6 +3,9 @@ import dotenv from "dotenv";
 import multer from "multer";
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 
+const authzMiddleware = require("./middleware/authzMiddleware")
+
+
 dotenv.config();
 const router = express.Router();
 
@@ -13,7 +16,12 @@ const client = new BedrockAgentRuntimeClient({
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post("/upload", upload.single("file"), async (req, res) => {
+router.post("/upload", 
+  authzMiddleware("invoke", "ai_agent", () => null), 
+  // AUTHORIZATION (authorize function right here)
+  upload.single("file"), 
+  async (req, res) => {
+
   try {
     const fileContents = req.file?.buffer.toString("utf-8");
     const userMessage = req.body?.userMessage;

@@ -1,8 +1,13 @@
 import supabase from "../db.js";
 import express from "express";
 const router = express.Router();
+const authzMiddleware = require("./middleware/authzMiddleware")
 
-router.get("/", async (req, res) => {
+
+router.get("/", 
+    authzMiddleware("read", "provider_selection",(req) => ({ userId: req.query.user })), 
+    // AUTHORIZATION (authorize function here)
+    async (req, res) => {
     const { user } = req.query;
 
     if (!user) {
@@ -29,7 +34,10 @@ router.get("/", async (req, res) => {
     }
 });
 
-router.post("/", async (req, res) => {
+router.post("/",
+    authzMiddleware(), 
+    // AUTHORIZATION (authorize function here)
+     async (req, res) => {
     const { userId, providerId } = req.body;
 
     if (!userId || !providerId) {

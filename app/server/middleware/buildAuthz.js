@@ -71,3 +71,5 @@ authzMiddleware(action, resource, getTarget = () => null)
 
   };
 }
+
+module.exports = authzMiddleware;
