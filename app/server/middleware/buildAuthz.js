@@ -26,7 +26,7 @@
 
 const jwt = require("jsonwebtoken"); 
 
-authzMiddleware(action, resource, getTarget = () => null)
+function authzMiddleware(action, resource, getTarget = () => null)
 {
   return function(req, res, next)
   {
