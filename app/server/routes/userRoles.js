@@ -1,11 +1,16 @@
 // routes/userRoles.js
 import express from "express";
 import { cognito, USER_POOL_ID } from "../config/cognito.js";
+const authzMiddleware = require("./middleware/authzMiddleware")
+
 
 const router = express.Router();
 
 // GET /api/user-roles - List all available roles/groups
-router.get("/", async (req, res) => {
+router.get("/",
+    authzMiddleware("read", "roles", () => null), 
+        // AUTHORIZATION (authorize function here)
+     async (req, res) => {
     try {
         const groups = await cognito.listGroups({
             UserPoolId: USER_POOL_ID,
@@ -27,10 +32,15 @@ router.get("/", async (req, res) => {
         console.error("Error listing roles:", err);
         res.status(500).json({ error: err.message });
     }
+
+    authzMiddleware
 });
 
 // GET /api/user-roles/:userId - Get user's current groups/roles
-router.get("/:userId", async (req, res) => {
+router.get("/:userId",
+    authzMiddleware("read", "user_roles", (req) => ({ userId: req.params.userId })), 
+        // AUTHORIZATION (authorize function here)
+     async (req, res) => {
     const { userId } = req.params;
 
     try {
@@ -55,7 +65,10 @@ router.get("/:userId", async (req, res) => {
 });
 
 // POST /api/user-roles - Change user's roles
-router.post("/", async (req, res) => {
+router.post("/",
+    authzMiddleware("update", "user_roles", (req) => ({userId: req.body.targetUserId})), 
+        // AUTHORIZATION (authorize function here)
+     async (req, res) => {
     const { adminUserId, targetUserId, newRoles } = req.body;
 
     if (!adminUserId || !targetUserId || !newRoles || !Array.isArray(newRoles)) {

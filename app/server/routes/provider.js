@@ -5,7 +5,7 @@ const authzMiddleware = require("./middleware/authzMiddleware")
 
 
 router.get("/", 
-    authzMiddleware("read", "provider_selection",(req) => ({ userId: req.query.user })), 
+    authzMiddleware("read", "provider_selection",(req) => ({ userId: req.query.user})), 
     // AUTHORIZATION (authorize function here)
     async (req, res) => {
     const { user } = req.query;
@@ -35,7 +35,7 @@ router.get("/",
 });
 
 router.post("/",
-    authzMiddleware(), 
+    authzMiddleware("update", "provider_selection", (req) => ({userId: req.body.userId})), 
     // AUTHORIZATION (authorize function here)
      async (req, res) => {
     const { userId, providerId } = req.body;

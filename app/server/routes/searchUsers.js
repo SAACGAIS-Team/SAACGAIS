@@ -1,9 +1,14 @@
 import express from "express";
 import { cognito, USER_POOL_ID } from "../config/cognito.js";
+const authzMiddleware = require("./middleware/authzMiddleware")
+
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/",
+  authzMiddleware("read", "users", () => null), 
+      // AUTHORIZATION (authorize function here)
+   async (req, res) => {
   const { role, search } = req.query;
 
   try {
@@ -65,7 +70,10 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/search-users/:userId - Get a single user by UID
-router.get("/:userId", async (req, res) => {
+router.get("/:userId",
+  authzMiddleware("read", "user", (req) => ({ userId: req.params.userId})), 
+      // AUTHORIZATION (authorize function here)
+   async (req, res) => {
   const { userId } = req.params;
 
   try {
