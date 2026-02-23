@@ -5,6 +5,7 @@ import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-b
 
 const authzMiddleware = require("./middleware/authzMiddleware")
 
+// set the target to null since we just want to know whether that specific role can access the ai agent 
 
 dotenv.config();
 const router = express.Router();
