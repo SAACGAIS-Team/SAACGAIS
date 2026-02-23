@@ -1,5 +1,7 @@
 import express from "express";
 import supabase from "../db.js";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
 

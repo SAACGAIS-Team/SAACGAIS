@@ -2,6 +2,9 @@ import express from "express";
 import dotenv from "dotenv";
 import multer from "multer";
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
+
 
 dotenv.config();
 const router = express.Router();

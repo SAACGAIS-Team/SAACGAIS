@@ -1,5 +1,8 @@
 import supabase from "../db.js";
 import express from "express";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
+
 const router = express.Router();
 
 router.get("/", async (req, res) => {

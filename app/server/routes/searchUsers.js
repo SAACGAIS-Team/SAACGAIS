@@ -1,4 +1,7 @@
 import express from "express";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
+
 import { cognito, USER_POOL_ID } from "../config/cognito.js";
 
 const router = express.Router();
