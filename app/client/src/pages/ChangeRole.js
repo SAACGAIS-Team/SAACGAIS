@@ -21,7 +21,7 @@ function ChangeRole() {
     useEffect(() => {
         const fetchAvailableRoles = async () => {
             try {
-                const data = await userService.getUserRoles();
+                const data = await userService.getUserRoles(auth.user?.id_token);
                 setRoles(data.roles.map(r => r.name));
             } catch (err) {
                 console.error("Error fetching roles:", err);
@@ -42,7 +42,7 @@ function ChangeRole() {
         const timeout = setTimeout(async () => {
             try {
                 setLoading(true);
-                const data = await userService.searchUsers(input);
+                const data = await userService.searchUsers(input, auth.user?.id_token);
                 setOptions(data);
             } catch (e) {
                 if (e.name !== "AbortError") console.error(e);
@@ -64,7 +64,7 @@ function ChangeRole() {
         const fetchUserRoles = async () => {
             try {
                 setLoadingRoles(true);
-                const data = await userService.getUserRolesById(selected.sub);
+                const data = await userService.getUserRolesById(selected.sub, auth.user?.id_token);
                 setCurrentRoles(data.roles || []);
                 setSelectedRoles(data.roles || []);
             } catch (err) {
@@ -86,33 +86,34 @@ function ChangeRole() {
         setMessage(null);
 
         try {
-            const userId = auth.user?.profile?.sub;
+            const token = auth.user?.id_token;
+            const adminUserId = auth.user?.profile?.sub;
 
-            if (!userId) {
+            if (!adminUserId) {
                 setMessage({ type: "error", text: "User not authenticated" });
                 return;
             }
 
-            // Update current roles to show the change immediately
+            await userService.updateUserRoles({
+                adminUserId,
+                targetUserId: selected.sub,
+                newRoles: selectedRoles,
+            }, token);
+
             setCurrentRoles(selectedRoles);
-            
-            // Show success message
+
             setMessage({ 
                 type: "success", 
                 text: `Successfully updated ${selected.firstName} ${selected.lastName}'s roles` 
             });
-            
-            // Only trigger role update if we modified the current user's roles
-            const isCurrentUser = selected.sub === userId;
+
+            const isCurrentUser = selected.sub === adminUserId;
             if (isCurrentUser) {
-                console.log("Updated current user's roles, triggering token refresh...");
                 setTimeout(() => {
                     triggerRoleUpdate(selected.sub);
                 }, 100);
-            } else {
-                console.log("Updated another user's roles, no token refresh needed");
             }
-            
+
         } catch (err) {
             console.error("Error changing roles:", err);
             setMessage({ type: "error", text: err.response?.data?.error || err.message });

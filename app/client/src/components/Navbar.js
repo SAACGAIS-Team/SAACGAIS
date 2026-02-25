@@ -21,7 +21,6 @@ export default function Navbar() {
   // Listen for role update events
   useEffect(() => {
     const handleRoleUpdate = async () => {
-      console.log("Role update detected, refreshing token...");
       try {
         await auth.signinSilent();
       } catch (err) {

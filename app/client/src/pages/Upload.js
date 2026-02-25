@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Box, Button, Typography, Paper, TextField, CircularProgress } from "@mui/material";
 import { aiService } from "../api.js";
+import { useAuth } from "react-oidc-context";
 
 function Upload() {
+  const auth = useAuth();
   const [aiReply, setAiReply] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -10,12 +12,12 @@ function Upload() {
 
   const handleSend = async () => {
     if (!userMessage && !selectedFile) return;
-
     setAiReply("");
     setLoading(true);
 
     try {
-      const data = await aiService.uploadFile(userMessage, selectedFile);
+      const token = auth.user?.id_token;
+      const data = await aiService.uploadFile(userMessage, selectedFile, token);
       setAiReply(data.reply);
     } catch (err) {
       setAiReply("Error: " + (err.response?.data?.error || err.message));

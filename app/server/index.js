@@ -3,6 +3,7 @@ dotenv.config();
 
 import cors from "cors";
 import express from "express";
+import authenticate from "./middleware/authenticate.js";
 import healthRoutes from "./routes/health.js";
 import bedrockRoute from "./routes/aiAgent.js";
 import searchUsersRoute from "./routes/searchUsers.js";
@@ -15,6 +16,10 @@ app.use(express.json());
 app.use(cors({ origin: "http://localhost:3000" }));
 
 app.use("/api/health", healthRoutes);
+
+// ANYTHING BELOW THIS LINE WILL REQUIRE AUTHENTICATION (see authenticate.js)
+app.use(authenticate);
+
 app.use("/api/ai", bedrockRoute);
 app.use("/api/search-users", searchUsersRoute);
 app.use("/api/provider", providerRoute);
