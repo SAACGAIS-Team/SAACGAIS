@@ -1,5 +1,15 @@
 import request from 'supertest';
 
+jest.mock('./middleware/authenticate.js', () => {
+  return (req, res, next) => {
+    req.user = {
+      sub: 'test-user-123',
+      roles: ['Admin'],
+    };
+    next();
+  };
+});
+
 // Mock Supabase BEFORE any imports that use it
 jest.mock('./db.js', () => ({
   supabase: {

@@ -6,4 +6,3 @@ export const cognitoAuthConfig = {
   response_type: "code",
   scope: "email openid phone profile",
 };
-
