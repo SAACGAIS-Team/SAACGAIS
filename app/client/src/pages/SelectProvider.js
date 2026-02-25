@@ -29,6 +29,7 @@ function SelectProvider() {
                 setLoadingCurrentProvider(true);
 
                 const userId = auth.user?.profile?.sub;
+                const token = auth.user?.id_token;
                 
                 if (!userId) {
                     console.log("User not authenticated");
@@ -37,12 +38,10 @@ function SelectProvider() {
                     return;
                 }
 
-                // Get provider UID from database using service
-                const response = await providerService.getByUserId(userId);
+                const response = await providerService.getByUserId(userId, token);
                 
                 if (response.ok && response.data && response.data.Provider_UID) {
-                    // Get provider info using service
-                    const providerInfo = await userService.getUserById(response.data.Provider_UID);
+                    const providerInfo = await userService.getUserById(response.data.Provider_UID, token);
                     
                     setCurrentProvider({
                         ...providerInfo,
@@ -73,8 +72,7 @@ function SelectProvider() {
         const timeout = setTimeout(async () => {
             try {
                 setLoading(true);
-                // Use service to search users by role
-                const data = await userService.searchUsersByRole("Healthcare-Provider", input);
+                const data = await userService.searchUsersByRole("Healthcare-Provider", input, auth.user?.id_token);
                 setOptions(data);
             } catch (e) {
                 if (e.name !== "AbortError") console.error(e);
@@ -94,22 +92,20 @@ function SelectProvider() {
 
         try {
             const userId = auth.user?.profile?.sub;
+            const token = auth.user?.id_token;
 
             if (!userId) {
                 setMessage({ type: "error", text: "User not authenticated" });
                 return;
             }
 
-            // Use service to select provider
-            // IMPORTANT: userId should be removed - backend gets from Cognito token
             await providerService.selectProvider({
                 userId: userId,  // TODO: Remove this - backend should use req.user.sub
                 providerId: selected.sub,
-            });
+            }, token);
 
             setMessage({ type: "success", text: "Provider updated successfully!" });
             
-            // Update current provider with selection time
             setCurrentProvider({
                 ...selected,
                 selectionTime: new Date().toISOString()

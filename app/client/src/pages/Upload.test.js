@@ -10,6 +10,15 @@ jest.mock("../api.js", () => ({
   },
 }));
 
+jest.mock("react-oidc-context", () => ({
+  useAuth: () => ({
+    user: {
+      id_token: "mock-token",
+      profile: { sub: "test-user-123" },
+    },
+  }),
+}));
+
 import { aiService } from "../api.js";
 
 describe("Upload component", () => {

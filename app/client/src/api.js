@@ -1,138 +1,69 @@
-import { fetchAuthSession, signOut } from "aws-amplify/auth";
 import { apiConfig } from "./apiConfig.js";
 
 // ============================================
 // Fetch Helper with Cognito Auth
 // ============================================
-async function fetchWithAuth(endpoint, options = {}) {
+async function fetchWithAuth(endpoint, options = {}, token = null) {
   const url = `${apiConfig.baseUrl}${endpoint}`;
-  
-  // Get Cognito token (aws-amplify v6)
-  let token = null;
-  try {
-    const session = await fetchAuthSession();
-    token = session.tokens?.idToken?.toString();
-  } catch (error) {
-    console.error("Failed to get auth token:", error);
-  }
-  
-  // Build headers
+
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
-  
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(url, {
     ...options,
     headers,
   });
-  
-  // Handle 401 - try token refresh
-  if (response.status === 401 && !options._retry) {
-    try {
-      const session = await fetchAuthSession({ forceRefresh: true });
-      const newToken = session.tokens?.idToken?.toString();
-      
-      return fetchWithAuth(endpoint, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: `Bearer ${newToken}`,
-        },
-        _retry: true,
-      });
-    } catch (refreshError) {
-      await signOut();
-      window.location.href = "/";
-      throw new Error("Authentication failed");
-    }
-  }
-  
+
   // Parse response
   const contentType = response.headers.get("content-type");
   let data;
-  
+
   if (contentType && contentType.includes("application/json")) {
     data = await response.json();
   } else {
     data = await response.text();
   }
-  
+
   if (!response.ok) {
     const error = new Error(data.error || data.message || "Request failed");
     error.response = { status: response.status, data };
     throw error;
   }
-  
+
   return data;
 }
 
 // ============================================
 // Fetch with FormData (for file uploads)
 // ============================================
-async function fetchWithAuthFormData(endpoint, formData) {
+async function fetchWithAuthFormData(endpoint, formData, token = null) {
   const url = `${apiConfig.baseUrl}${endpoint}`;
-  
-  // Get Cognito token (aws-amplify v6)
-  let token = null;
-  try {
-    const session = await fetchAuthSession();
-    token = session.tokens?.idToken?.toString();
-  } catch (error) {
-    console.error("Failed to get auth token:", error);
-  }
-  
-  // Build headers (no Content-Type for FormData - browser sets it with boundary)
+
   const headers = {};
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(url, {
     method: "POST",
     headers,
     body: formData,
   });
-  
-  // Handle 401 - try token refresh
-  if (response.status === 401) {
-    try {
-      const session = await fetchAuthSession({ forceRefresh: true });
-      const newToken = session.tokens?.idToken?.toString();
-      
-      headers.Authorization = `Bearer ${newToken}`;
-      const retryResponse = await fetch(url, {
-        method: "POST",
-        headers,
-        body: formData,
-      });
-      
-      const data = await retryResponse.json();
-      if (!retryResponse.ok) {
-        const error = new Error(data.error || "Request failed");
-        error.response = { status: retryResponse.status, data };
-        throw error;
-      }
-      return data;
-    } catch (refreshError) {
-      await signOut();
-      window.location.href = "/";
-      throw new Error("Authentication failed");
-    }
-  }
-  
+
   const data = await response.json();
-  
+
   if (!response.ok) {
     const error = new Error(data.error || "Request failed");
     error.response = { status: response.status, data };
     throw error;
   }
-  
+
   return data;
 }
 
@@ -149,21 +80,20 @@ export const healthService = {
 // AI Service
 // ============================================
 export const aiService = {
-  query: async (prompt) => {
+  query: async (prompt, token) => {
     return await fetchWithAuth(apiConfig.endpoints.ai, {
       method: "POST",
       body: JSON.stringify({ prompt }),
-    });
+    }, token);
   },
-  
-  uploadFile: async (userMessage, file) => {
+
+  uploadFile: async (userMessage, file, token) => {
     const formData = new FormData();
     formData.append("userMessage", userMessage);
     if (file) {
       formData.append("file", file);
     }
-    
-    return await fetchWithAuthFormData("/ai/upload", formData);
+    return await fetchWithAuthFormData("/ai/upload", formData, token);
   },
 };
 
@@ -171,33 +101,33 @@ export const aiService = {
 // User Service
 // ============================================
 export const userService = {
-  searchUsers: async (query) => {
-    return await fetchWithAuth(`/search-users?search=${encodeURIComponent(query)}`);
+  searchUsers: async (query, token) => {
+    return await fetchWithAuth(`/search-users?search=${encodeURIComponent(query)}`, {}, token);
   },
-  
-  searchUsersByRole: async (role, query) => {
+
+  searchUsersByRole: async (role, query, token) => {
     return await fetchWithAuth(
-      `/search-users?role=${encodeURIComponent(role)}&search=${encodeURIComponent(query)}`
+      `/search-users?role=${encodeURIComponent(role)}&search=${encodeURIComponent(query)}`, {}, token
     );
   },
-  
-  getUserById: async (userId) => {
-    return await fetchWithAuth(`/search-users/${userId}`);
+
+  getUserById: async (userId, token) => {
+    return await fetchWithAuth(`/search-users/${userId}`, {}, token);
   },
-  
-  getUserRoles: async () => {
-    return await fetchWithAuth("/user-roles");
+
+  getUserRoles: async (token) => {
+    return await fetchWithAuth("/user-roles", {}, token);
   },
-  
-  getUserRolesById: async (userId) => {
-    return await fetchWithAuth(`/user-roles/${userId}`);
+
+  getUserRolesById: async (userId, token) => {
+    return await fetchWithAuth(`/user-roles/${userId}`, {}, token);
   },
-  
-  updateUserRoles: async (data) => {
+
+  updateUserRoles: async (data, token) => {
     return await fetchWithAuth("/user-roles", {
       method: "POST",
       body: JSON.stringify(data),
-    });
+    }, token);
   },
 };
 
@@ -205,46 +135,43 @@ export const userService = {
 // Provider Service
 // ============================================
 export const providerService = {
-  getAll: async () => {
-    return await fetchWithAuth("/provider");
+  getAll: async (token) => {
+    return await fetchWithAuth("/provider", {}, token);
   },
-  
-  getById: async (id) => {
-    return await fetchWithAuth(`/provider/${id}`);
+
+  getById: async (id, token) => {
+    return await fetchWithAuth(`/provider/${id}`, {}, token);
   },
-  
-  getByUserId: async (userId) => {
-    return await fetchWithAuth(`/provider?user=${encodeURIComponent(userId)}`);
+
+  getByUserId: async (userId, token) => {
+    return await fetchWithAuth(`/provider?user=${encodeURIComponent(userId)}`, {}, token);
   },
-  
-  create: async (providerData) => {
-    // Note: DO NOT include userId - backend gets it from Cognito token
+
+  create: async (providerData, token) => {
     return await fetchWithAuth("/provider", {
       method: "POST",
       body: JSON.stringify(providerData),
-    });
+    }, token);
   },
-  
-  selectProvider: async (data) => {
-    // IMPORTANT: userId should be removed in backend - it gets from Cognito token
+
+  selectProvider: async (data, token) => {
     return await fetchWithAuth("/provider", {
       method: "POST",
       body: JSON.stringify(data),
-    });
+    }, token);
   },
-  
-  update: async (id, providerData) => {
-    // Note: DO NOT include userId - backend gets it from Cognito token
+
+  update: async (id, providerData, token) => {
     return await fetchWithAuth(`/provider/${id}`, {
       method: "PUT",
       body: JSON.stringify(providerData),
-    });
+    }, token);
   },
-  
-  delete: async (id) => {
+
+  delete: async (id, token) => {
     return await fetchWithAuth(`/provider/${id}`, {
       method: "DELETE",
-    });
+    }, token);
   },
 };
 
@@ -252,39 +179,35 @@ export const providerService = {
 // Patient Service
 // ============================================
 export const patientService = {
-  getAll: async () => {
-    return await fetchWithAuth("/patients");
+  getAll: async (token) => {
+    return await fetchWithAuth("/patients", {}, token);
   },
-  
-  getById: async (patientId) => {
-    return await fetchWithAuth(`/patients/${patientId}`);
+
+  getById: async (patientId, token) => {
+    return await fetchWithAuth(`/patients/${patientId}`, {}, token);
   },
-  
-  create: async (patientData) => {
-    // CRITICAL: Do NOT include userId, providerId, etc.
-    // Backend will use req.user.sub from Cognito token
+
+  create: async (patientData, token) => {
     return await fetchWithAuth("/patients", {
       method: "POST",
       body: JSON.stringify(patientData),
-    });
+    }, token);
   },
-  
-  update: async (patientId, patientData) => {
-    // CRITICAL: Do NOT include userId, providerId, etc.
+
+  update: async (patientId, patientData, token) => {
     return await fetchWithAuth(`/patients/${patientId}`, {
       method: "PUT",
       body: JSON.stringify(patientData),
-    });
+    }, token);
   },
-  
-  delete: async (patientId) => {
+
+  delete: async (patientId, token) => {
     return await fetchWithAuth(`/patients/${patientId}`, {
       method: "DELETE",
-    });
+    }, token);
   },
 };
 
-// Export all services as default
 export default {
   health: healthService,
   ai: aiService,
