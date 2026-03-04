@@ -95,7 +95,6 @@ function ChangeRole() {
             }
 
             await userService.updateUserRoles({
-                adminUserId,
                 targetUserId: selected.sub,
                 newRoles: selectedRoles,
             }, token);

@@ -6,15 +6,11 @@ import authorize from "../middleware/authorize.js";
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-    const { user } = req.query;
-
-    if (!user) {
-        return res.status(400).json({ error: "User ID is required" });
-    }
+    const userId = req.user.sub; // was: const { user } = req.query
 
     try {
         const { data, error } = await supabase.rpc("Get_Provider_Selection", {
-            user_id: user
+            user_id: userId
         });
 
         if (error) {
@@ -22,10 +18,7 @@ router.get("/", async (req, res) => {
             return res.status(500).json({ error: error.message });
         }
 
-        res.json({ 
-            ok: true, 
-            data
-        });
+        res.json({ ok: true, data });
     } catch (err) {
         console.error("Error getting provider:", err);
         res.status(500).json({ error: err.message });
@@ -33,16 +26,14 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-    const { userId, providerId } = req.body;
+    const userId = req.user.sub; // was: const { userId, providerId } = req.body
+    const { providerId } = req.body;
 
-    if (!userId || !providerId) {
-        return res.status(400).json({ 
-            error: "userId and providerId are required" 
-        });
+    if (!providerId) {
+        return res.status(400).json({ error: "providerId is required" });
     }
 
     try {
-        // First, delete existing provider selection
         const { error: deleteError } = await supabase.rpc("Delete_Provider_Selection", {
             patient_uid: userId
         });
@@ -52,7 +43,6 @@ router.post("/", async (req, res) => {
             return res.status(500).json({ error: deleteError.message });
         }
 
-        // Then, insert new provider selection
         const { data, error: insertError } = await supabase.rpc("Insert_Provider_Selection", {
             patient_uid: userId,
             provider_uid: providerId
@@ -63,11 +53,7 @@ router.post("/", async (req, res) => {
             return res.status(500).json({ error: insertError.message });
         }
 
-        res.json({ 
-            ok: true,
-            message: "Provider assigned successfully",
-            data: data
-        });
+        res.json({ ok: true, message: "Provider assigned successfully", data });
     } catch (err) {
         console.error("Error setting provider:", err);
         res.status(500).json({ error: err.message });

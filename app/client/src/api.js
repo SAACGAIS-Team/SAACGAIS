@@ -143,8 +143,8 @@ export const providerService = {
     return await fetchWithAuth(`/provider/${id}`, {}, token);
   },
 
-  getByUserId: async (userId, token) => {
-    return await fetchWithAuth(`/provider?user=${encodeURIComponent(userId)}`, {}, token);
+  getByUserId: async (token) => {
+    return await fetchWithAuth("/provider", {}, token);
   },
 
   create: async (providerData, token) => {

@@ -59,11 +59,12 @@ router.get("/:userId", async (req, res) => {
 
 // POST /api/user-roles - Change user's roles
 router.post("/", async (req, res) => {
-    const { adminUserId, targetUserId, newRoles } = req.body;
+    const adminUserId = req.user.sub; // was: const { adminUserId, targetUserId, newRoles } = req.body
+    const { targetUserId, newRoles } = req.body;
 
-    if (!adminUserId || !targetUserId || !newRoles || !Array.isArray(newRoles)) {
+    if (!targetUserId || !newRoles || !Array.isArray(newRoles)) {
         return res.status(400).json({ 
-            error: "adminUserId, targetUserId, and newRoles (array) are required" 
+            error: "targetUserId and newRoles (array) are required" 
         });
     }
 

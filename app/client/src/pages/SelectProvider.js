@@ -38,7 +38,7 @@ function SelectProvider() {
                     return;
                 }
 
-                const response = await providerService.getByUserId(userId, token);
+                const response = await providerService.getByUserId(token);
                 
                 if (response.ok && response.data && response.data.Provider_UID) {
                     const providerInfo = await userService.getUserById(response.data.Provider_UID, token);
@@ -99,10 +99,7 @@ function SelectProvider() {
                 return;
             }
 
-            await providerService.selectProvider({
-                userId: userId,  // TODO: Remove this - backend should use req.user.sub
-                providerId: selected.sub,
-            }, token);
+            await providerService.selectProvider({ providerId: selected.sub }, token);
 
             setMessage({ type: "success", text: "Provider updated successfully!" });
             
