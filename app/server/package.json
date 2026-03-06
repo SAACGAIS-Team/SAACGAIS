@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "test": "cross-env NODE_ENV=test jest --ci",
@@ -11,7 +12,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.927.0",
     "@aws-sdk/client-bedrock-runtime": "^3.927.0",
@@ -39,5 +39,14 @@
     "eslint-plugin-react": "^7.37.5",
     "jest": "^30.2.0",
     "supertest": "^7.1.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {
+      "^.+\\.(js|jsx|mjs)$": "babel-jest"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@aws-sdk|uuid)/)"
+    ]
   }
 }
