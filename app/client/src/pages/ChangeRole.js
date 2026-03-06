@@ -130,7 +130,7 @@ function ChangeRole() {
     };
 
     return (
-        <Box sx={{ p: 4, maxWidth: 600 }}>
+        <Box sx={{ padding: 4, maxWidth: 900, margin: "0 auto" }}>
             <Typography variant="h4" gutterBottom>
                 Change User Roles
             </Typography>
