@@ -87,13 +87,55 @@ export const aiService = {
     }, token);
   },
 
-  uploadFile: async (userMessage, file, token) => {
+  // OLD FUNCTION, NEEDS TO ONLY PROMPT THE AI IN THE FUTURE, NEW VERSION IS UPLOAD SERVICE BELOW
+  // uploadFile: async (userMessage, file, token) => {
+  //   const formData = new FormData();
+  //   formData.append("userMessage", userMessage);
+  //   if (file) {
+  //     formData.append("file", file);
+  //   }
+  //   return await fetchWithAuthFormData("/ai/upload", formData, token);
+  // },
+};
+
+// ============================================
+// Upload Service
+// ============================================
+export const uploadService = {
+  uploadFiles: async (files, token) => {
     const formData = new FormData();
-    formData.append("userMessage", userMessage);
-    if (file) {
-      formData.append("file", file);
+    for (const file of files) {
+      formData.append("files", file);
     }
-    return await fetchWithAuthFormData("/ai/upload", formData, token);
+    return await fetchWithAuthFormData("/upload/file", formData, token);
+  },
+
+  uploadText: async (text, token) => {
+    return await fetchWithAuth("/upload/text", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }, token);
+  },
+
+  getFileUploads: async (token) => {
+    return await fetchWithAuth("/upload/file", {}, token);
+  },
+
+  getTextUploads: async (token) => {
+    return await fetchWithAuth("/upload/text", {}, token);
+  },
+
+  getSignedUrl: async (s3Key, token) => {
+    return await fetchWithAuth(`/upload/signed-url?key=${encodeURIComponent(s3Key)}`, {}, token);
+  },
+
+  downloadFile: async (s3Key, token) => {
+    const url = `${apiConfig.baseUrl}/upload/download?key=${encodeURIComponent(s3Key)}`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Download failed");
+    return response.blob();
   },
 };
 
@@ -214,4 +256,5 @@ export default {
   user: userService,
   provider: providerService,
   patient: patientService,
+  upload: uploadService,
 };

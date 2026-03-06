@@ -132,7 +132,7 @@ function SelectProvider() {
     };
 
     return (
-        <Box sx={{ p: 4, maxWidth: 500 }}>
+        <Box sx={{ padding: 4, maxWidth: 900, margin: "0 auto" }}>
             <Typography variant="h4" gutterBottom>
                 Select Primary Care Provider
             </Typography>

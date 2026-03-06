@@ -1,94 +1,264 @@
-import { useState } from "react";
-import { Box, Button, Typography, Paper, TextField, CircularProgress } from "@mui/material";
-import { aiService } from "../api.js";
+import { useState, useEffect } from "react";
+import {
+  Box, Button, Typography, TextField, CircularProgress,
+  Alert, Divider, List, ListItem, ListItemText, Chip, IconButton, Tooltip
+} from "@mui/material";
+import DownloadIcon from "@mui/icons-material/Download";
+import { uploadService } from "../api.js";
 import { useAuth } from "react-oidc-context";
 
 function Upload() {
   const auth = useAuth();
-  const [aiReply, setAiReply] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [userMessage, setUserMessage] = useState("");
 
-  const handleSend = async () => {
-    if (!userMessage && !selectedFile) return;
-    setAiReply("");
-    setLoading(true);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileMessage, setFileMessage] = useState(null);
+  const [fileHistory, setFileHistory] = useState([]);
+
+  const [text, setText] = useState("");
+  const [textLoading, setTextLoading] = useState(false);
+  const [textMessage, setTextMessage] = useState(null);
+  const [textHistory, setTextHistory] = useState([]);
+
+  const [downloadingKey, setDownloadingKey] = useState(null);
+
+  const token = auth.user?.id_token;
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const [fileRes, textRes] = await Promise.all([
+          uploadService.getFileUploads(token),
+          uploadService.getTextUploads(token),
+        ]);
+        setFileHistory(fileRes.uploads || []);
+        setTextHistory(textRes.uploads || []);
+      } catch (err) {
+        console.error("Error fetching upload history:", err);
+      }
+    };
+
+    if (token) fetchHistory();
+  }, [token]);
+
+  const handleFileSelect = (e) => {
+    const newFiles = Array.from(e.target.files);
+    setSelectedFiles(prev => {
+      const existingNames = prev.map(f => f.name);
+      const filtered = newFiles.filter(f => !existingNames.includes(f.name));
+      return [...prev, ...filtered];
+    });
+    e.target.value = "";
+  };
+
+  const handleRemoveFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFileUpload = async () => {
+    if (selectedFiles.length === 0) return;
+    setFileLoading(true);
+    setFileMessage(null);
 
     try {
-      const token = auth.user?.id_token;
-      const data = await aiService.uploadFile(userMessage, selectedFile, token);
-      setAiReply(data.reply);
+      await uploadService.uploadFiles(selectedFiles, token);
+      setFileMessage({ type: "success", text: `${selectedFiles.length} file(s) uploaded successfully` });
+      setSelectedFiles([]);
+
+      const res = await uploadService.getFileUploads(token);
+      setFileHistory(res.uploads || []);
     } catch (err) {
-      setAiReply("Error: " + (err.response?.data?.error || err.message));
+      setFileMessage({ type: "error", text: err.response?.data?.error || err.message });
     } finally {
-      setLoading(false);
-      setUserMessage("");
-      setSelectedFile(null);
+      setFileLoading(false);
     }
   };
 
+  const handleTextUpload = async () => {
+    if (!text.trim()) return;
+    setTextLoading(true);
+    setTextMessage(null);
+
+    try {
+      await uploadService.uploadText(text, token);
+      setTextMessage({ type: "success", text: "Text saved successfully" });
+      setText("");
+
+      const res = await uploadService.getTextUploads(token);
+      setTextHistory(res.uploads || []);
+    } catch (err) {
+      setTextMessage({ type: "error", text: err.response?.data?.error || err.message });
+    } finally {
+      setTextLoading(false);
+    }
+  };
+
+  const handleDownload = async (s3Key, fileName) => {
+    setDownloadingKey(s3Key);
+    try {
+      const blob = await uploadService.downloadFile(s3Key, token);
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download error:", err);
+    } finally {
+      setDownloadingKey(null);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit"
+    });
+  };
+
   return (
-    <Box sx={{ padding: 4 }}>
+    <Box sx={{ padding: 4, maxWidth: 900, margin: "0 auto" }}>
       <Typography variant="h4" gutterBottom>
-        Upload Documents & Send Message
+        Upload
       </Typography>
 
-      {/* Large Text Box */}
-      <TextField
-        label="Message to AI"
-        multiline
-        minRows={6}
-        maxRows={12}
-        variant="outlined"
-        fullWidth
-        value={userMessage}
-        onChange={(e) => setUserMessage(e.target.value)}
-        sx={{ mb: 2 }}
-      />
+      <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
 
-      {/* File Upload */}
-      <input
-        type="file"
-        id="file-upload"
-        style={{ display: "none" }}
-        onChange={(e) => setSelectedFile(e.target.files[0])}
-      />
-      <label htmlFor="file-upload">
-        <Button variant="contained" component="span" color="primary" sx={{ mb: 2 }}>
-          {selectedFile ? "Change File" : "Choose File"}
-        </Button>
-      </label>
-      {selectedFile && (
-        <Paper sx={{ mt: 1, p: 1, backgroundColor: "#f5f5f5" }}>
-          Selected file: {selectedFile.name}
-        </Paper>
-      )}
+        {/* ── File Upload Section ── */}
+        <Box sx={{ flex: 1, minWidth: 300 }}>
+          <Typography variant="h6" gutterBottom>File Upload</Typography>
 
-      {/* Send Button */}
-      <Box sx={{ mt: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSend}
-          disabled={loading || (!userMessage && !selectedFile)}
-        >
-          Send to AI
-        </Button>
-      </Box>
+          {/* This wrapper ensures the buttons stay stacked even when empty */}
+          <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, mb: 2 }}>
+            <input
+              type="file"
+              id="file-upload"
+              multiple
+              style={{ display: "none" }}
+              onChange={handleFileSelect}
+            />
+            <label htmlFor="file-upload">
+              <Button variant="outlined" component="span" fullWidth={false}>
+                Choose Files
+              </Button>
+            </label>
 
-      {/* AI Reply */}
-      <Box sx={{ minHeight: 300 }}>
-        {loading && (
-          <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
-            <CircularProgress color="primary" />
-          </Paper>
-        )}
-        {!loading && aiReply && (
-          <Paper sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5" }}>
-            <strong>AI Reply:</strong> {aiReply}
-          </Paper>
-        )}
+            <Button
+              variant="contained"
+              onClick={handleFileUpload}
+              disabled={fileLoading || selectedFiles.length === 0}
+            >
+              {fileLoading ? <CircularProgress size={24} color="inherit" /> : "Upload Files"}
+            </Button>
+          </Box>
+
+          {/* Selected File Chips (Moved below the buttons) */}
+          {selectedFiles.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              {selectedFiles.map((file, i) => (
+                <Chip
+                  key={i}
+                  label={file.name}
+                  onDelete={() => handleRemoveFile(i)}
+                  sx={{ mr: 0.5, mb: 0.5 }}
+                />
+              ))}
+            </Box>
+          )}
+
+          {fileMessage && (
+            <Alert severity={fileMessage.type} sx={{ mb: 2 }} onClose={() => setFileMessage(null)}>
+              {fileMessage.text}
+            </Alert>
+          )}
+
+          <Divider sx={{ mb: 2 }} />
+          <Typography variant="subtitle1" gutterBottom>File History</Typography>
+
+          {fileHistory.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
+          ) : (
+            <List dense>
+              {fileHistory.map((f) => (
+                <ListItem
+                  key={f.File_Upload_ID}
+                  disableGutters
+                  secondaryAction={
+                    <Tooltip title="Download">
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleDownload(f.S3_Key, f.File_Name)}
+                        disabled={downloadingKey === f.S3_Key}
+                      >
+                        {downloadingKey === f.S3_Key
+                          ? <CircularProgress size={18} />
+                          : <DownloadIcon />}
+                      </IconButton>
+                    </Tooltip>
+                  }
+                >
+                  <ListItemText
+                    primary={f.File_Name}
+                    secondary={formatDate(f.Upload_Time)}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Box>
+
+        {/* ── Text Upload Section ── */}
+        <Box sx={{ flex: 1, minWidth: 300 }}>
+          <Typography variant="h6" gutterBottom>Text Upload</Typography>
+
+          <TextField
+            label="Enter text"
+            multiline
+            minRows={6}
+            maxRows={12}
+            variant="outlined"
+            fullWidth
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+
+          {textMessage && (
+            <Alert severity={textMessage.type} sx={{ mb: 2 }} onClose={() => setTextMessage(null)}>
+              {textMessage.text}
+            </Alert>
+          )}
+
+          <Button
+            variant="contained"
+            onClick={handleTextUpload}
+            disabled={textLoading || !text.trim()}
+            sx={{ mb: 3 }}
+          >
+            {textLoading ? <CircularProgress size={24} color="inherit" /> : "Save Text"}
+          </Button>
+
+          <Divider sx={{ mb: 2 }} />
+          <Typography variant="subtitle1" gutterBottom>Text History</Typography>
+
+          {textHistory.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No text uploaded yet.</Typography>
+          ) : (
+            <List dense>
+              {textHistory.map((t) => (
+                <ListItem key={t.Text_Upload_ID} disableGutters>
+                  <ListItemText
+                    primary={t.Text_Content.length > 80 ? t.Text_Content.slice(0, 80) + "..." : t.Text_Content}
+                    secondary={formatDate(t.Upload_Time)}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Box>
       </Box>
     </Box>
   );

@@ -11,7 +11,7 @@ function Home() {
   }, [auth.user]);
 
   return (
-    <Box sx={{ p: 4, maxWidth: 800}}>
+    <Box sx={{ padding: 4, maxWidth: 900, margin: "0 auto" }}>
       <Typography variant="h3" sx={{ mb: 2, fontWeight: "bold" }}>
         Welcome to SAACGAIS
       </Typography>
