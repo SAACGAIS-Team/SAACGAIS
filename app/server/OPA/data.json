@@ -1,0 +1,26 @@
+{
+  "roles": {
+    "Administrator": {
+      "description": "Full system access. Can manage users, records, and audit logs."
+    },
+    "Clinician": {
+      "description": "Healthcare provider. Can read/write patient records and invoke AI agent with patient context."
+    },
+    "Patient": {
+      "description": "End user. Can only access their own records and invoke AI agent for their own session."
+    }
+  },
+  "resources": {
+    "ai_agent":           "AWS Bedrock agent invocation endpoint",
+    "patient_record":     "Healthcare record belonging to a patient",
+    "users":              "User profile data",
+    "provider_selection": "A patient's chosen healthcare provider",
+    "audit_log":          "System-wide access and event log"
+  },
+  "actions": {
+    "read":   "Retrieve data",
+    "write":  "Create or update data",
+    "delete": "Remove data",
+    "invoke": "Trigger an external service or agent"
+  }
+}
