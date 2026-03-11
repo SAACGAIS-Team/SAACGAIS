@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Box, TextField, Button, Typography, CircularProgress, Autocomplete, Alert } from "@mui/material";
 import { useAuth } from "react-oidc-context";
 import { providerService, userService } from "../api.js";
+import ConfirmationDialog from "../components/ConfirmationDialog.js";
 
 function SelectProvider() {
     const [open, setOpen] = useState(false);
@@ -13,7 +14,13 @@ function SelectProvider() {
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [message, setMessage] = useState(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const auth = useAuth();
+
+    const showMessage = (type, text) => {
+        setMessage({ type: type, text: text });
+        setTimeout(() => setMessage(null), 5000);
+    };
 
     useEffect(() => {
         // Keep showing loading while auth is loading
@@ -95,13 +102,13 @@ function SelectProvider() {
             const token = auth.user?.id_token;
 
             if (!userId) {
-                setMessage({ type: "error", text: "User not authenticated" });
+                showMessage("error", "User not authenticated");
                 return;
             }
 
             await providerService.selectProvider({ providerId: selected.sub }, token);
 
-            setMessage({ type: "success", text: "Provider updated successfully!" });
+            showMessage("success", "Provider updated successfully!");
             
             setCurrentProvider({
                 ...selected,
@@ -110,12 +117,11 @@ function SelectProvider() {
             
             setSelected(null);
             setInput("");
+            setConfirmOpen(false);
         } catch (err) {
             console.error("Error setting provider:", err);
-            setMessage({ 
-                type: "error", 
-                text: err.response?.data?.error || err.message 
-            });
+            showMessage("error", err.response?.data?.error || err.message);
+            setConfirmOpen(false);
         } finally {
             setSubmitting(false);
         }
@@ -198,10 +204,19 @@ function SelectProvider() {
                 variant="contained" 
                 sx={{ mt: 2 }} 
                 disabled={!selected || submitting} 
-                onClick={handleSubmit}
+                onClick={() => setConfirmOpen(true)}
             >
-                {submitting ? <CircularProgress size={24} /> : "Submit"}
+                {submitting || confirmOpen ? <CircularProgress size={24} /> : "Submit"}
             </Button>
+
+            <ConfirmationDialog
+                open={confirmOpen}
+                title="Confirm Provider Selection"
+                body={`Are you sure you want to select ${selected ? `${selected.firstName} ${selected.lastName}` : "this provider"} as your primary care provider? They will be able to view your uploaded documents and text entries, but not your private notes.`}
+                onConfirm={handleSubmit}
+                onCancel={() => !submitting && setConfirmOpen(false)}
+                loading={submitting}
+            />
         </Box>
     );
 }
