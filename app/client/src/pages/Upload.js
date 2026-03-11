@@ -24,6 +24,16 @@ function Upload() {
 
   const token = auth.user?.id_token;
 
+  const showFileMessage = (type, text) => {
+    setFileMessage({ type: type, text: text });
+    setTimeout(() => setFileMessage(null), 5000);
+  };
+
+  const showTextMessage = (type, text) => {
+    setTextMessage({ type: type, text: text });
+    setTimeout(() => setTextMessage(null), 5000);
+  };
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -62,13 +72,13 @@ function Upload() {
 
     try {
       await uploadService.uploadFiles(selectedFiles, token);
-      setFileMessage({ type: "success", text: `${selectedFiles.length} file(s) uploaded successfully` });
+      showFileMessage("success", `${selectedFiles.length} file(s) uploaded successfully`);
       setSelectedFiles([]);
 
       const res = await uploadService.getFileUploads(token);
       setFileHistory(res.uploads || []);
     } catch (err) {
-      setFileMessage({ type: "error", text: err.response?.data?.error || err.message });
+      showFileMessage("error", err.response?.data?.error || err.message);
     } finally {
       setFileLoading(false);
     }
@@ -81,13 +91,13 @@ function Upload() {
 
     try {
       await uploadService.uploadText(text, token);
-      setTextMessage({ type: "success", text: "Text saved successfully" });
+      showTextMessage("success", "Text saved successfully");
       setText("");
 
       const res = await uploadService.getTextUploads(token);
       setTextHistory(res.uploads || []);
     } catch (err) {
-      setTextMessage({ type: "error", text: err.response?.data?.error || err.message });
+      showTextMessage("error", err.response?.data?.error || err.message);
     } finally {
       setTextLoading(false);
     }

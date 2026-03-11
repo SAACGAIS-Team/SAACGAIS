@@ -18,6 +18,11 @@ function ChangeRole() {
     const [roles, setRoles] = useState([]);
     const auth = useAuth();
 
+    const showMessage = (type, text) => {
+        setMessage({ type: type, text: text });
+        setTimeout(() => setMessage(null), 5000);
+    };
+
     useEffect(() => {
         const fetchAvailableRoles = async () => {
             try {
@@ -90,7 +95,7 @@ function ChangeRole() {
             const adminUserId = auth.user?.profile?.sub;
 
             if (!adminUserId) {
-                setMessage({ type: "error", text: "User not authenticated" });
+                showMessage("error", "User not authenticated");
                 return;
             }
 
@@ -101,10 +106,7 @@ function ChangeRole() {
 
             setCurrentRoles(selectedRoles);
 
-            setMessage({ 
-                type: "success", 
-                text: `Successfully updated ${selected.firstName} ${selected.lastName}'s roles` 
-            });
+            showMessage("success", `Successfully updated ${selected.firstName} ${selected.lastName}'s roles`);
 
             const isCurrentUser = selected.sub === adminUserId;
             if (isCurrentUser) {
@@ -115,7 +117,7 @@ function ChangeRole() {
 
         } catch (err) {
             console.error("Error changing roles:", err);
-            setMessage({ type: "error", text: err.response?.data?.error || err.message });
+            showMessage("error", err.response?.data?.error || err.message);
         } finally {
             setSubmitting(false);
         }
@@ -171,7 +173,19 @@ function ChangeRole() {
                 }}
                 filterOptions={(x) => x}
                 isOptionEqualToValue={(a, b) => a.sub === b.sub}
-                getOptionLabel={(o) => `${o.firstName} ${o.lastName} (${o.email})`}
+                getOptionLabel={(o) => {
+                    const isCurrentUser = o.sub === auth.user?.profile?.sub;
+                    return `${o.firstName} ${o.lastName} (${o.email})${isCurrentUser ? " (You)" : ""}`;
+                }}
+                renderOption={(props, o) => {
+                    const isCurrentUser = o.sub === auth.user?.profile?.sub;
+                    return (
+                        <li {...props} key={o.sub}>
+                            {o.firstName} {o.lastName} ({o.email})
+                            {isCurrentUser && <Chip label="You" size="small" sx={{ ml: 1 }} />}
+                        </li>
+                    );
+                }}
                 renderInput={(params) => (
                     <TextField
                         {...params}
