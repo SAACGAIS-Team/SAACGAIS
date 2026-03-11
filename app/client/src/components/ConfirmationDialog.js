@@ -1,3 +1,4 @@
+import PropTypes from "prop-types";
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 
 function ConfirmationDialog({ open, title, body, onConfirm, onCancel, loading = false }) {
@@ -18,5 +19,14 @@ function ConfirmationDialog({ open, title, body, onConfirm, onCancel, loading = 
         </Dialog>
     );
 }
+
+ConfirmationDialog.propTypes = {
+    open: PropTypes.bool.isRequired,
+    title: PropTypes.string.isRequired,
+    body: PropTypes.string.isRequired,
+    onConfirm: PropTypes.func.isRequired,
+    onCancel: PropTypes.func.isRequired,
+    loading: PropTypes.bool,
+};
 
 export default ConfirmationDialog;
