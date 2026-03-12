@@ -72,7 +72,12 @@ export default function Navbar() {
               Upload
             </Button>
           )}
-          
+
+          {(userGroups.includes("Patient")) && (
+            <Button color="inherit" component={Link} to="/chat" sx={{ color: "white" }}>
+              Chat
+            </Button>
+          )}
           {(userGroups.includes("Patient")) && (
             <Button color="inherit" component={Link} to="/select-provider" sx={{ color: "white" }}>
               Select Provider

@@ -9,6 +9,7 @@ import SelectProvider from "./pages/SelectProvider.js";
 import ChangeRole from "./pages/ChangeRole.js";
 import About from "./pages/About.js";
 import Callback from "./pages/Callback.js";
+import Chat from "./pages/Chat.js";
 
 function ProtectedRoute({ children, allowedGroups = [] }) {
   const auth = useAuth();
@@ -57,6 +58,14 @@ function App() {
           element={
             <ProtectedRoute allowedGroups={["Patient"]}>
               <Upload />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute allowedGroups={["Patient"]}>
+              <Chat />
             </ProtectedRoute>
           }
         />
