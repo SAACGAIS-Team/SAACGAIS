@@ -10,6 +10,7 @@ import searchUsersRoute from "./routes/searchUsers.js";
 import providerRoute from "./routes/provider.js";
 import userRolesRoute from "./routes/userRoles.js";
 import uploadRoute from "./routes/upload.js";
+import userSettingsRouter from "./routes/userSettings.js";
 
 const app = express();
 app.use(express.json());
@@ -26,6 +27,7 @@ app.use("/api/search-users", searchUsersRoute);
 app.use("/api/provider", providerRoute);
 app.use("/api/user-roles", userRolesRoute);
 app.use("/api/upload", uploadRoute);
+app.use("/api/user", authenticate, userSettingsRouter);
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(3001, () => {

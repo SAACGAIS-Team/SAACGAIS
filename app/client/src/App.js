@@ -1,4 +1,3 @@
-// import React, { useEffect } from "react";
 import PropTypes from "prop-types";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
@@ -9,6 +8,7 @@ import SelectProvider from "./pages/SelectProvider.js";
 import ChangeRole from "./pages/ChangeRole.js";
 import About from "./pages/About.js";
 import Callback from "./pages/Callback.js";
+import AccountSettings from "./pages/AccountSettings.js";
 
 function ProtectedRoute({ children, allowedGroups = [] }) {
   const auth = useAuth();
@@ -75,6 +75,15 @@ function App() {
           element={
             <ProtectedRoute allowedGroups={["Administrator"]}>
               <ChangeRole />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/account-settings"
+          element={
+            <ProtectedRoute>
+              <AccountSettings />
             </ProtectedRoute>
           }
         />

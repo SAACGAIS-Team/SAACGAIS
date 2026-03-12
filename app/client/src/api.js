@@ -171,6 +171,20 @@ export const userService = {
       body: JSON.stringify(data),
     }, token);
   },
+
+  updateUserAttributes: async (data, token) => {
+    return await fetchWithAuth("/user/attributes", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }, token);
+  },
+
+  changePassword: async (data, token) => {
+    return await fetchWithAuth("/user/password", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }, token);
+  },
 };
 
 // ============================================
