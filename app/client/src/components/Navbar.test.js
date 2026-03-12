@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "react-oidc-context";
 import Navbar from "./Navbar";
+import { ThemeProvider } from "../context/ThemeContext";
 
 const mockAuthConfig = {
   authority: "https://example.com",
@@ -17,17 +18,17 @@ describe("Navbar component", () => {
     render(
       <MemoryRouter>
         <AuthProvider {...mockAuthConfig}>
-          <Navbar />
+          <ThemeProvider>
+            <Navbar />
+          </ThemeProvider>
         </AuthProvider>
       </MemoryRouter>
     );
 
-    // Brand title
     const brand = screen.getByText("SAACGAIS");
     expect(brand).toBeInTheDocument();
     expect(brand.closest("a")).toHaveAttribute("href", "/");
 
-    // Navigation links (MUI Button with component={Link} becomes <a>)
     const homeLink = screen.getByRole("link", { name: "Home" });
     const aboutLink = screen.getByRole("link", { name: "About" });
 

@@ -206,7 +206,7 @@ function ChangeRole() {
             />
 
             {selected && (
-                <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
                     <Typography variant="body2" color="text.secondary">
                         Selected User:
                     </Typography>

@@ -4,6 +4,7 @@ import './index.css';
 import App from './App.js';
 import { AuthProvider } from "react-oidc-context";
 import { cognitoAuthConfig } from "./cognitoAuthConfig.js";
+import { ThemeProvider } from "./context/ThemeContext.js";
 
 window.addEventListener('error', (e) => {
   if (e.message === 'ResizeObserver loop completed with undelivered notifications.') {
@@ -15,7 +16,9 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <AuthProvider {...cognitoAuthConfig}>
-      <App />
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
     </AuthProvider>
   </React.StrictMode>
 );
