@@ -13,7 +13,7 @@ export function ThemeProvider({ children }) {
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("darkMode") !== null
       ? localStorage.getItem("darkMode") === "true"
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
+      : typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
   );
 
   useEffect(() => {
