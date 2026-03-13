@@ -41,6 +41,16 @@ const REFRESH_COOKIE_OPTIONS = {
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 };
 
+// Must exactly match COOKIE_OPTIONS (minus maxAge) for clearCookie to work.
+// Any mismatch in sameSite, secure, httpOnly, or path means the browser
+// won't recognize them as the same cookie and won't clear them.
+const CLEAR_OPTIONS = {
+  path: "/",
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+};
+
 // POST /auth/login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -247,9 +257,9 @@ router.post("/refresh", async (req, res) => {
     return res.status(200).json({ message: "Token refreshed." });
   } catch (err) {
     console.error("Refresh error:", err);
-    res.clearCookie("access_token");
-    res.clearCookie("id_token");
-    res.clearCookie("refresh_token");
+    res.clearCookie("access_token", CLEAR_OPTIONS);
+    res.clearCookie("id_token", CLEAR_OPTIONS);
+    res.clearCookie("refresh_token", CLEAR_OPTIONS);
     return res.status(401).json({ error: "Session expired. Please log in again." });
   }
 });
@@ -314,25 +324,23 @@ router.post("/logout", async (req, res) => {
     }
   }
 
-  res.clearCookie("access_token", { path: "/" });
-  res.clearCookie("id_token", { path: "/" });
-  res.clearCookie("refresh_token", { path: "/" });
+  res.clearCookie("access_token", CLEAR_OPTIONS);
+  res.clearCookie("id_token", CLEAR_OPTIONS);
+  res.clearCookie("refresh_token", CLEAR_OPTIONS);
+  res.clearCookie("XSRF-TOKEN", { path: "/" });
 
   return res.status(200).json({ message: "Logged out." });
 });
 
 // GET /auth/csrf-token
 router.get("/csrf-token", (req, res) => {
-  const csrfToken = crypto.randomBytes(32).toString('hex');
-  
-  // Store it in the session or a secure, non-HttpOnly cookie
-  // Here we set it in a non-HttpOnly cookie so the client can read it
+  const csrfToken = crypto.randomBytes(32).toString("hex");
   res.cookie("XSRF-TOKEN", csrfToken, {
-    httpOnly: false,
+    httpOnly: false, // must be readable by JS
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict"
+    sameSite: "strict",
+    path: "/",
   });
-  
   res.status(200).json({ csrfToken });
 });
 

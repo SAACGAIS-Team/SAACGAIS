@@ -1,5 +1,13 @@
 export default function csrfCheck(req, res, next) {
-  const publicPaths = ['/auth/login', '/auth/signup', '/auth/resend-code', '/auth/confirm', '/auth/csrf-token'];
+  const publicPaths = [
+    '/auth/login',
+    '/auth/signup',
+    '/auth/resend-code',
+    '/auth/confirm',
+    '/auth/csrf-token',
+    '/auth/logout',
+    '/auth/refresh',
+  ];
 
   if (publicPaths.includes(req.path)) {
     return next();

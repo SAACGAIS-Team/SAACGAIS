@@ -21,7 +21,6 @@ const app = express();
 app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
-app.use(csrfCheck);
 
 app.use(
   cors({
@@ -35,6 +34,7 @@ app.use("/api/health", healthRoutes);
 app.use("/auth", authRoutes);
 
 // ANYTHING BELOW THIS LINE REQUIRES AUTHENTICATION
+app.use(csrfCheck);
 app.use(authenticate);
 
 app.use("/api/ai", bedrockRoute);

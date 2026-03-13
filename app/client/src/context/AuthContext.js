@@ -6,14 +6,21 @@ const AuthContext = createContext(null);
 const API = apiConfig.baseUrl;
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);      
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchMe = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/auth/me`, { credentials: "include" });
+    if (isLoggingOut) return;
 
+    try {
+      const res = await fetch(`${API}/auth/me`, {
+        credentials: "include",
+        headers: { "Cache-Control": "no-store" }
+      });
+
+      // Handle Token Expiration and Refresh
       if (res.status === 401) {
         const data = await res.json();
         if (data.code === "TOKEN_EXPIRED") {
@@ -45,9 +52,11 @@ export function AuthProvider({ children }) {
       console.error("fetchMe error:", err);
       setUser(null);
     }
-  }, []);
+  }, [isLoggingOut]);
 
   useEffect(() => {
+    if (isLoggingOut) return;
+
     const initialize = async () => {
       try {
         await fetch(`${API}/auth/csrf-token`, { credentials: "include" });
@@ -59,7 +68,7 @@ export function AuthProvider({ children }) {
       }
     };
     initialize();
-  }, [fetchMe]);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     setError(null);
@@ -79,7 +88,7 @@ export function AuthProvider({ children }) {
 
     if (data.challenge) return { challenge: data.challenge, session: data.session };
 
-    await fetchMe(); 
+    await fetchMe();
     return { success: true };
   }, [fetchMe]);
 
@@ -131,12 +140,18 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    setIsLoggingOut(true);
     try {
-      await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" });
+      await fetch(`${API}/auth/logout`, { 
+        method: "POST", 
+        credentials: "include" 
+      });
     } catch (err) {
       console.warn("Logout request failed:", err);
+    } finally {
+      setUser(null);
+      setIsLoggingOut(false);
     }
-    setUser(null);
   }, []);
 
   return (
