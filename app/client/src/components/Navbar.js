@@ -115,6 +115,12 @@ export default function Navbar() {
             </Button>
           )}
 
+          {(userGroups.includes("Patient") || userGroups.includes("Provider")) && (
+            <Button color="inherit" component={Link} to="/chat" sx={{ color: "white" }}>
+              Chat
+            </Button>
+          )}
+
           {userGroups.includes("Patient") && (
             <Button color="inherit" component={Link} to="/select-provider" sx={{ color: "white", fontSize: "12px" }}>
               Select Provider
