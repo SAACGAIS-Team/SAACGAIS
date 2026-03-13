@@ -33,6 +33,13 @@ export function ThemeProvider({ children }) {
   const theme = useMemo(() => createTheme({
     palette: {
       mode: darkMode ? "dark" : "light",
+      background: {
+        // Light mode: white, Dark mode: deep charcoal
+        default: darkMode ? "#121212" : "#f5f5f5",
+        // Light mode: white, Dark mode: your preferred lighter grey
+        paper: darkMode ? "#1e1e1e" : "#ffffff",
+      },
+      divider: darkMode ? "#2a2a2a" : "#e0e0e0",
     },
   }), [darkMode]);
 

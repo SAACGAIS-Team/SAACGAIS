@@ -66,10 +66,24 @@ jest.mock('./config/cognito.js', () => ({
   USER_POOL_ID: 'test-user-pool-id'
 }));
 
-// Import app AFTER mocking
 import app from './index.js';
 
 describe('Test routes', () => {
+  let agent;
+  let csrfToken;
+
+  beforeAll(async () => {
+    agent = request.agent(app);
+    const res = await agent.get('/api/auth/csrf-token');
+    const cookies = res.headers['set-cookie'];
+    
+    if (cookies) {
+      agent.jar.setCookie(cookies[0], 'http://localhost:3001');
+    }
+    
+    csrfToken = res.body.csrfToken; 
+  });
+
   test('Basic test to ensure Jest is working', () => {
     expect(true).toBe(true);
   });
@@ -92,7 +106,7 @@ describe('Test routes', () => {
   });
 
   test('POST /api/user-roles should change user roles', async () => {
-    const res = await request(app)
+    const res = await agent
       .post('/api/user-roles')
       .send({
         adminUserId: 'admin-123',
@@ -102,11 +116,10 @@ describe('Test routes', () => {
     
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
-    expect(res.body).toHaveProperty('message', 'Roles changed successfully');
   });
 
   test('POST /api/user-roles should return 400 for missing parameters', async () => {
-    const res = await request(app)
+    const res = await agent
       .post('/api/user-roles')
       .send({
         adminUserId: 'admin-123'

@@ -1,29 +1,24 @@
 import { Typography, Box, Chip } from "@mui/material";
-import { useEffect, useState } from "react";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../context/AuthContext.js";
+import PageCard from "../components/PageCard.js";
 
 function Home() {
-  const auth = useAuth();
-  const [userGroups, setUserGroups] = useState([]);
-
-  useEffect(() => {
-    setUserGroups(auth.user?.profile?.["cognito:groups"] || []);
-  }, [auth.user]);
+  const { user, isAuthenticated } = useAuth();
+  const userGroups = user?.groups || [];
 
   return (
-    <Box sx={{ padding: 4, maxWidth: 900, margin: "0 auto" }}>
+    <PageCard>
       <Typography variant="h3" sx={{ mb: 2, fontWeight: "bold" }}>
         Welcome to SAACGAIS
       </Typography>
 
-      {auth.isAuthenticated ? (
+      {isAuthenticated ? (
         <>
           {userGroups.length > 0 ? (
             <>
               <Typography variant="body1" component="p" sx={{ mb: 1, color: "text.secondary" }}>
                 You are assigned the following roles:
               </Typography>
-
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                 {userGroups.map((role) => (
                   <Chip key={role} label={role} color="primary" variant="outlined" />
@@ -41,7 +36,7 @@ function Home() {
           You are not logged in
         </Typography>
       )}
-    </Box>
+    </PageCard>
   );
 }
 

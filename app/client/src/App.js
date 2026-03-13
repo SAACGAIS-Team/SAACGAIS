@@ -1,33 +1,29 @@
 import PropTypes from "prop-types";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "./context/AuthContext.js";
 import Navbar from "./components/Navbar.js";
 import Home from "./pages/Home.js";
 import Upload from "./pages/Upload.js";
 import SelectProvider from "./pages/SelectProvider.js";
 import ChangeRole from "./pages/ChangeRole.js";
 import About from "./pages/About.js";
-import Callback from "./pages/Callback.js";
 import AccountSettings from "./pages/AccountSettings.js";
+import Login from "./pages/Login.js";
+import Signup from "./pages/Signup.js";
 
 function ProtectedRoute({ children, allowedGroups = [] }) {
-  const auth = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
-  if (auth.isLoading) {
+  if (isLoading) {
     return <div>Loading...</div>;
   }
 
-  if (auth.error) {
-    return <div>Error: {auth.error.message}</div>;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
-  if (!auth.isAuthenticated) {
-    auth.signinRedirect({ state: { from: location.pathname } });
-    return <div>Redirecting to sign in...</div>;
-  }
-
-  const userGroups = auth.user?.profile?.["cognito:groups"] || [];
+  const userGroups = user?.groups || [];
   const isAllowed = allowedGroups.length === 0 || userGroups.some((g) => allowedGroups.includes(g));
 
   if (!isAllowed) {
@@ -43,14 +39,15 @@ ProtectedRoute.propTypes = {
 };
 
 function App() {
-  const auth = useAuth();
-
   return (
     <Router>
-      <Navbar auth={auth} />
+      <Navbar />
 
       <Routes>
         <Route path="/" element={<Home />} />
+
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
         <Route
           path="/upload"
@@ -89,8 +86,6 @@ function App() {
         />
 
         <Route path="/about" element={<About />} />
-
-        <Route path="/callback" element={<Callback />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
