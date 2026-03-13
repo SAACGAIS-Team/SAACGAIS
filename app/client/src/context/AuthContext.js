@@ -1,24 +1,21 @@
 import PropTypes from "prop-types";
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { apiConfig } from "../apiConfig.js";
 
 const AuthContext = createContext(null);
-
-const API = "http://localhost:3001";
+const API = apiConfig.baseUrl;
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);         // { email, given_name, family_name, sub, groups }
+  const [user, setUser] = useState(null);      
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch current user from /auth/me (uses httpOnly cookie automatically)
   const fetchMe = useCallback(async () => {
     try {
       const res = await fetch(`${API}/auth/me`, { credentials: "include" });
 
       if (res.status === 401) {
         const data = await res.json();
-
-        // Token expired — try to refresh
         if (data.code === "TOKEN_EXPIRED") {
           const refreshRes = await fetch(`${API}/auth/refresh`, {
             method: "POST",
@@ -26,7 +23,6 @@ export function AuthProvider({ children }) {
           });
 
           if (refreshRes.ok) {
-            // Retry /auth/me after refresh
             const retryRes = await fetch(`${API}/auth/me`, { credentials: "include" });
             if (retryRes.ok) {
               const retryData = await retryRes.json();
@@ -35,7 +31,6 @@ export function AuthProvider({ children }) {
             }
           }
         }
-
         setUser(null);
         return;
       }
@@ -52,9 +47,18 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // On mount, check if user is already logged in
   useEffect(() => {
-    fetchMe().finally(() => setIsLoading(false));
+    const initialize = async () => {
+      try {
+        await fetch(`${API}/auth/csrf-token`, { credentials: "include" });
+        await fetchMe();
+      } catch (err) {
+        console.error("Initialization failed:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initialize();
   }, [fetchMe]);
 
   const login = useCallback(async (email, password) => {
@@ -67,39 +71,33 @@ export function AuthProvider({ children }) {
     });
 
     const data = await res.json();
-
     if (!res.ok) {
       const err = data.error || "Login failed.";
       setError(err);
       throw new Error(err);
     }
 
-    // If Cognito returned a challenge
-    if (data.challenge) {
-      return { challenge: data.challenge, session: data.session };
-    }
+    if (data.challenge) return { challenge: data.challenge, session: data.session };
 
-    await fetchMe(); // populate user state from /auth/me
+    await fetchMe(); 
     return { success: true };
   }, [fetchMe]);
 
-  const signup = useCallback(async ({ email, password, given_name, family_name, birthdate, phone_number }) => {
+  const signup = useCallback(async (payload) => {
     setError(null);
     const res = await fetch(`${API}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ email, password, given_name, family_name, birthdate, phone_number }),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
-
     if (!res.ok) {
       const err = data.error || "Signup failed.";
       setError(err);
       throw new Error(err);
     }
-
     return { email: data.email };
   }, []);
 
@@ -112,14 +110,12 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ email, code }),
     });
 
-    const data = await res.json();
-
     if (!res.ok) {
+      const data = await res.json();
       const err = data.error || "Confirmation failed.";
       setError(err);
       throw new Error(err);
     }
-
     return true;
   }, []);
 
@@ -130,31 +126,25 @@ export function AuthProvider({ children }) {
       credentials: "include",
       body: JSON.stringify({ email }),
     });
-
     if (!res.ok) throw new Error("Failed to resend code.");
     return true;
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await fetch(`${API}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" });
     } catch (err) {
       console.warn("Logout request failed:", err);
     }
     setUser(null);
   }, []);
 
-  const isAuthenticated = !!user;
-
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
-        isAuthenticated,
+        isAuthenticated: !!user,
         error,
         login,
         signup,

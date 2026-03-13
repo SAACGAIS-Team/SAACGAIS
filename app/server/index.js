@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import helmet from "helmet";
 import cors from "cors";
 import express from "express";
 import cookieParser from "cookie-parser";
@@ -13,11 +14,14 @@ import providerRoute from "./routes/provider.js";
 import userRolesRoute from "./routes/userRoles.js";
 import uploadRoute from "./routes/upload.js";
 import userSettingsRouter from "./routes/userSettings.js";
+import csrfCheck from "./middleware/csrf.js";
 
 const app = express();
 
+app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
+app.use(csrfCheck);
 
 app.use(
   cors({

@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
@@ -30,7 +31,7 @@ function getClientId() {
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: "strict",
   maxAge: 60 * 60 * 1000, // 1 hour
   path: "/",
 };
@@ -318,6 +319,21 @@ router.post("/logout", async (req, res) => {
   res.clearCookie("refresh_token", { path: "/" });
 
   return res.status(200).json({ message: "Logged out." });
+});
+
+// GET /auth/csrf-token
+router.get("/csrf-token", (req, res) => {
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  
+  // Store it in the session or a secure, non-HttpOnly cookie
+  // Here we set it in a non-HttpOnly cookie so the client can read it
+  res.cookie("XSRF-TOKEN", csrfToken, {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict"
+  });
+  
+  res.status(200).json({ csrfToken });
 });
 
 export default router;

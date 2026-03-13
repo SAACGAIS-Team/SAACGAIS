@@ -1,5 +1,8 @@
+const BASE_URL = "http://localhost:3001";
+
 export const apiConfig = {
-  baseUrl: "http://localhost:3001/api",
+  baseUrl: BASE_URL,
+  baseUrlAPI: `${BASE_URL}/api`,
   
   endpoints: {
     health: "/health",

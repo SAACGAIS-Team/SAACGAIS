@@ -1,30 +1,39 @@
 import { apiConfig } from "./apiConfig.js";
 
+// Helper to get CSRF token from the browser cookie
+const getCsrfToken = () => {
+  const match = document.cookie.match(new RegExp('(^| )XSRF-TOKEN=([^;]+)'));
+  return match ? match[2] : null;
+};
+
+// Helper to check if the method changes data (requires CSRF protection)
+const isMutatingMethod = (method) => ["POST", "PUT", "DELETE"].includes(method?.toUpperCase());
+
 // ============================================
-// Fetch Helper — cookies sent automatically
+// Fetch Helper — JSON
 // ============================================
 async function fetchWithAuth(endpoint, options = {}) {
-  const url = `${apiConfig.baseUrl}${endpoint}`;
-
+  const url = `${apiConfig.baseUrlAPI}${endpoint}`;
+  
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
 
+  // Minimal Change: Inject CSRF header for POST/PUT/DELETE
+  if (isMutatingMethod(options.method)) {
+    const token = getCsrfToken();
+    if (token) headers["X-CSRF-Token"] = token;
+  }
+
   const response = await fetch(url, {
     ...options,
     headers,
-    credentials: "include", // sends httpOnly cookie on every request
+    credentials: "include",
   });
 
   const contentType = response.headers.get("content-type");
-  let data;
-
-  if (contentType && contentType.includes("application/json")) {
-    data = await response.json();
-  } else {
-    data = await response.text();
-  }
+  let data = contentType?.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
     const error = new Error(data.error || data.message || "Request failed");
@@ -39,16 +48,20 @@ async function fetchWithAuth(endpoint, options = {}) {
 // Fetch with FormData (file uploads)
 // ============================================
 async function fetchWithAuthFormData(endpoint, formData) {
-  const url = `${apiConfig.baseUrl}${endpoint}`;
+  const url = `${apiConfig.baseUrlAPI}${endpoint}`;
+
+  // Minimal Change: Inject CSRF header (Always POST)
+  const token = getCsrfToken();
+  const headers = token ? { "X-CSRF-Token": token } : {};
 
   const response = await fetch(url, {
     method: "POST",
+    headers,
     body: formData,
-    credentials: "include", // sends httpOnly cookie
+    credentials: "include",
   });
 
   const data = await response.json();
-
   if (!response.ok) {
     const error = new Error(data.error || "Request failed");
     error.response = { status: response.status, data };
@@ -111,7 +124,7 @@ export const uploadService = {
   },
 
   downloadFile: async (s3Key) => {
-    const url = `${apiConfig.baseUrl}/upload/download?key=${encodeURIComponent(s3Key)}`;
+    const url = `${apiConfig.baseUrlAPI}/upload/download?key=${encodeURIComponent(s3Key)}`;
     const response = await fetch(url, { credentials: "include" });
     if (!response.ok) throw new Error("Download failed");
     return response.blob();
