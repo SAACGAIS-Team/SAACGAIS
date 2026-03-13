@@ -4,41 +4,37 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import SettingsIcon from '@mui/icons-material/Settings';
-import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
+import SettingsIcon from "@mui/icons-material/Settings";
+import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useThemeMode } from "../context/ThemeContext.js";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
-import { cognitoAuthConfig } from "../cognitoAuthConfig.js";
+import { useAuth } from "../context/AuthContext.js";
 import { listenForRoleUpdates } from "../utils/roleUpdateEvent.js";
 
 export default function Navbar() {
-  const auth = useAuth();
+  const { user, isAuthenticated, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const [userGroups, setUserGroups] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const { darkMode, setDarkMode } = useThemeMode();
   const menuRef = useRef(null);
-  
-  useEffect(() => {
-    setUserGroups(auth.user?.profile?.["cognito:groups"] || []);
-  }, [auth.user]);
 
-  // Listen for role update events
+  const userGroups = user?.groups || [];
+
+  // Listen for role update events — re-fetch /auth/me to get updated groups
   useEffect(() => {
     const handleRoleUpdate = async () => {
       try {
-        await auth.signinSilent();
+        await refreshUser();
       } catch (err) {
-        console.error("Error refreshing token:", err);
+        console.error("Error refreshing user:", err);
       }
     };
 
     const cleanup = listenForRoleUpdates(handleRoleUpdate);
     return cleanup;
-  }, [auth]);
+  }, [refreshUser]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -51,27 +47,22 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = async () => {
+    await logout();
     navigate("/");
-    const clientId = cognitoAuthConfig.client_id;
-    const logoutUri = encodeURIComponent(cognitoAuthConfig.post_logout_redirect_uri);
-    const cognitoDomain = "https://us-east-2syjjxolri.auth.us-east-2.amazoncognito.com";
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${logoutUri}`;
-    await auth.removeUser();
   };
 
   const handleLogin = () => {
-    auth.signinRedirect();
+    navigate("/login");
   };
 
   const getInitials = () => {
-    const first = auth.user?.profile?.given_name?.[0] || "";
-    const last = auth.user?.profile?.family_name?.[0] || "";
+    const first = user?.given_name?.[0] || "";
+    const last = user?.family_name?.[0] || "";
     return (first + last).toUpperCase() || "?";
   };
 
   const getAvatarColor = () => {
-    // Consistent color based on email
-    const email = auth.user?.profile?.email || "";
+    const email = user?.email || "";
     const colors = ["#1d4ed8", "#0f766e", "#7c3aed", "#b45309", "#be123c"];
     const index = email.charCodeAt(0) % colors.length;
     return colors[index];
@@ -126,7 +117,7 @@ export default function Navbar() {
           </Button>
 
           {/* Authenticated: avatar dropdown */}
-          {auth.isAuthenticated ? (
+          {isAuthenticated ? (
             <Box ref={menuRef} sx={{ position: "relative", ml: 1 }}>
               {/* Avatar pill trigger */}
               <Box
@@ -164,7 +155,7 @@ export default function Navbar() {
                   {getInitials()}
                 </Box>
                 <Typography sx={{ fontSize: "13px", color: "#ddd" }}>
-                  {auth.user?.profile?.given_name}
+                  {user?.given_name}
                 </Typography>
                 <Typography sx={{ fontSize: "10px", color: "#888", mt: "1px" }}>▼</Typography>
               </Box>
@@ -206,10 +197,10 @@ export default function Navbar() {
                     </Box>
                     <Box>
                       <Typography sx={{ fontSize: "13px", fontWeight: 500, color: "#eee", lineHeight: 1.3 }}>
-                        {auth.user?.profile?.given_name} {auth.user?.profile?.family_name}
+                        {user?.given_name} {user?.family_name}
                       </Typography>
                       <Typography sx={{ fontSize: "11px", color: "#888", lineHeight: 1.3 }}>
-                        {auth.user?.profile?.email}
+                        {user?.email}
                       </Typography>
                     </Box>
                   </Box>

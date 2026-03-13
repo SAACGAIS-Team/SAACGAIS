@@ -5,10 +5,11 @@ import {
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import { uploadService } from "../api.js";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../context/AuthContext.js";
+import PageCard from "../components/PageCard.js";
 
-function Upload() {
-  const auth = useAuth();
+export default function Upload() {
+  const { isAuthenticated } = useAuth();
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
@@ -22,47 +23,49 @@ function Upload() {
 
   const [downloadingKey, setDownloadingKey] = useState(null);
 
-  const token = auth.user?.id_token;
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   const showFileMessage = (type, text) => {
-    setFileMessage({ type: type, text: text });
+    setFileMessage({ type, text });
     setTimeout(() => setFileMessage(null), 5000);
   };
 
   const showTextMessage = (type, text) => {
-    setTextMessage({ type: type, text: text });
+    setTextMessage({ type, text });
     setTimeout(() => setTextMessage(null), 5000);
   };
 
   useEffect(() => {
     const fetchHistory = async () => {
+      setLoadingHistory(true);
       try {
         const [fileRes, textRes] = await Promise.all([
-          uploadService.getFileUploads(token),
-          uploadService.getTextUploads(token),
+          uploadService.getFileUploads(),
+          uploadService.getTextUploads(),
         ]);
         setFileHistory(fileRes.uploads || []);
         setTextHistory(textRes.uploads || []);
       } catch (err) {
         console.error("Error fetching upload history:", err);
+      } finally {
+        setLoadingHistory(false); // Stop loading
       }
     };
 
-    if (token) fetchHistory();
-  }, [token]);
+    if (isAuthenticated) fetchHistory();
+  }, [isAuthenticated]);
 
   const handleFileSelect = (e) => {
     const newFiles = Array.from(e.target.files);
-    setSelectedFiles(prev => {
-      const existingNames = prev.map(f => f.name);
-      const filtered = newFiles.filter(f => !existingNames.includes(f.name));
-      return [...prev, ...filtered];
+    setSelectedFiles((prev) => {
+      const existingNames = prev.map((f) => f.name);
+      return [...prev, ...newFiles.filter((f) => !existingNames.includes(f.name))];
     });
     e.target.value = "";
   };
 
   const handleRemoveFile = (index) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleFileUpload = async () => {
@@ -71,11 +74,10 @@ function Upload() {
     setFileMessage(null);
 
     try {
-      await uploadService.uploadFiles(selectedFiles, token);
+      await uploadService.uploadFiles(selectedFiles);
       showFileMessage("success", `${selectedFiles.length} file(s) uploaded successfully`);
       setSelectedFiles([]);
-
-      const res = await uploadService.getFileUploads(token);
+      const res = await uploadService.getFileUploads();
       setFileHistory(res.uploads || []);
     } catch (err) {
       showFileMessage("error", err.response?.data?.error || err.message);
@@ -90,11 +92,10 @@ function Upload() {
     setTextMessage(null);
 
     try {
-      await uploadService.uploadText(text, token);
+      await uploadService.uploadText(text);
       showTextMessage("success", "Text saved successfully");
       setText("");
-
-      const res = await uploadService.getTextUploads(token);
+      const res = await uploadService.getTextUploads();
       setTextHistory(res.uploads || []);
     } catch (err) {
       showTextMessage("error", err.response?.data?.error || err.message);
@@ -106,7 +107,7 @@ function Upload() {
   const handleDownload = async (s3Key, fileName) => {
     setDownloadingKey(s3Key);
     try {
-      const blob = await uploadService.downloadFile(s3Key, token);
+      const blob = await uploadService.downloadFile(s3Key);
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
@@ -125,23 +126,18 @@ function Upload() {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric", month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit"
+      hour: "2-digit", minute: "2-digit",
     });
   };
 
   return (
-    <Box sx={{ padding: 4, maxWidth: 900, margin: "0 auto" }}>
-      <Typography variant="h4" gutterBottom>
-        Upload
-      </Typography>
+    <PageCard>
+      <Typography variant="h4" gutterBottom>Upload</Typography>
 
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-
-        {/* ── File Upload Section ── */}
+        {/* File Upload Section */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           <Typography variant="h6" gutterBottom>File Upload</Typography>
-
-          {/* This wrapper ensures the buttons stay stacked even when empty */}
           <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, mb: 2 }}>
             <input
               type="file"
@@ -151,11 +147,8 @@ function Upload() {
               onChange={handleFileSelect}
             />
             <label htmlFor="file-upload">
-              <Button variant="outlined" component="span" fullWidth={false}>
-                Choose Files
-              </Button>
+              <Button variant="outlined" component="span">Choose Files</Button>
             </label>
-
             <Button
               variant="contained"
               onClick={handleFileUpload}
@@ -165,16 +158,10 @@ function Upload() {
             </Button>
           </Box>
 
-          {/* Selected File Chips (Moved below the buttons) */}
           {selectedFiles.length > 0 && (
             <Box sx={{ mb: 2 }}>
               {selectedFiles.map((file, i) => (
-                <Chip
-                  key={i}
-                  label={file.name}
-                  onDelete={() => handleRemoveFile(i)}
-                  sx={{ mr: 0.5, mb: 0.5 }}
-                />
+                <Chip key={i} label={file.name} onDelete={() => handleRemoveFile(i)} sx={{ mr: 0.5, mb: 0.5 }} />
               ))}
             </Box>
           )}
@@ -187,8 +174,11 @@ function Upload() {
 
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>File History</Typography>
-
-          {fileHistory.length === 0 ? (
+          {loadingHistory ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : fileHistory.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
           ) : (
             <List dense>
@@ -203,27 +193,21 @@ function Upload() {
                         onClick={() => handleDownload(f.S3_Key, f.File_Name)}
                         disabled={downloadingKey === f.S3_Key}
                       >
-                        {downloadingKey === f.S3_Key
-                          ? <CircularProgress size={18} />
-                          : <DownloadIcon />}
+                        {downloadingKey === f.S3_Key ? <CircularProgress size={18} /> : <DownloadIcon />}
                       </IconButton>
                     </Tooltip>
                   }
                 >
-                  <ListItemText
-                    primary={f.File_Name}
-                    secondary={formatDate(f.Upload_Time)}
-                  />
+                  <ListItemText primary={f.File_Name} secondary={formatDate(f.Upload_Time)} />
                 </ListItem>
               ))}
             </List>
           )}
         </Box>
 
-        {/* ── Text Upload Section ── */}
+        {/* Text Upload Section */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           <Typography variant="h6" gutterBottom>Text Upload</Typography>
-
           <TextField
             label="Enter text"
             multiline
@@ -235,13 +219,11 @@ function Upload() {
             onChange={(e) => setText(e.target.value)}
             sx={{ mb: 2 }}
           />
-
           {textMessage && (
             <Alert severity={textMessage.type} sx={{ mb: 2 }} onClose={() => setTextMessage(null)}>
               {textMessage.text}
             </Alert>
           )}
-
           <Button
             variant="contained"
             onClick={handleTextUpload}
@@ -253,8 +235,11 @@ function Upload() {
 
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>Text History</Typography>
-
-          {textHistory.length === 0 ? (
+          {loadingHistory ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : textHistory.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No text uploaded yet.</Typography>
           ) : (
             <List dense>
@@ -270,8 +255,6 @@ function Upload() {
           )}
         </Box>
       </Box>
-    </Box>
+    </PageCard>
   );
 }
-
-export default Upload;

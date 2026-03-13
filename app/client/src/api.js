@@ -1,9 +1,9 @@
 import { apiConfig } from "./apiConfig.js";
 
 // ============================================
-// Fetch Helper with Cognito Auth
+// Fetch Helper — cookies sent automatically
 // ============================================
-async function fetchWithAuth(endpoint, options = {}, token = null) {
+async function fetchWithAuth(endpoint, options = {}) {
   const url = `${apiConfig.baseUrl}${endpoint}`;
 
   const headers = {
@@ -11,16 +11,12 @@ async function fetchWithAuth(endpoint, options = {}, token = null) {
     ...options.headers,
   };
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include", // sends httpOnly cookie on every request
   });
 
-  // Parse response
   const contentType = response.headers.get("content-type");
   let data;
 
@@ -40,20 +36,15 @@ async function fetchWithAuth(endpoint, options = {}, token = null) {
 }
 
 // ============================================
-// Fetch with FormData (for file uploads)
+// Fetch with FormData (file uploads)
 // ============================================
-async function fetchWithAuthFormData(endpoint, formData, token = null) {
+async function fetchWithAuthFormData(endpoint, formData) {
   const url = `${apiConfig.baseUrl}${endpoint}`;
-
-  const headers = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   const response = await fetch(url, {
     method: "POST",
-    headers,
     body: formData,
+    credentials: "include", // sends httpOnly cookie
   });
 
   const data = await response.json();
@@ -80,60 +71,48 @@ export const healthService = {
 // AI Service
 // ============================================
 export const aiService = {
-  query: async (prompt, token) => {
+  query: async (prompt) => {
     return await fetchWithAuth(apiConfig.endpoints.ai, {
       method: "POST",
       body: JSON.stringify({ prompt }),
-    }, token);
+    });
   },
-
-  // OLD FUNCTION, NEEDS TO ONLY PROMPT THE AI IN THE FUTURE, NEW VERSION IS UPLOAD SERVICE BELOW
-  // uploadFile: async (userMessage, file, token) => {
-  //   const formData = new FormData();
-  //   formData.append("userMessage", userMessage);
-  //   if (file) {
-  //     formData.append("file", file);
-  //   }
-  //   return await fetchWithAuthFormData("/ai/upload", formData, token);
-  // },
 };
 
 // ============================================
 // Upload Service
 // ============================================
 export const uploadService = {
-  uploadFiles: async (files, token) => {
+  uploadFiles: async (files) => {
     const formData = new FormData();
     for (const file of files) {
       formData.append("files", file);
     }
-    return await fetchWithAuthFormData("/upload/file", formData, token);
+    return await fetchWithAuthFormData("/upload/file", formData);
   },
 
-  uploadText: async (text, token) => {
+  uploadText: async (text) => {
     return await fetchWithAuth("/upload/text", {
       method: "POST",
       body: JSON.stringify({ text }),
-    }, token);
-  },
-
-  getFileUploads: async (token) => {
-    return await fetchWithAuth("/upload/file", {}, token);
-  },
-
-  getTextUploads: async (token) => {
-    return await fetchWithAuth("/upload/text", {}, token);
-  },
-
-  getSignedUrl: async (s3Key, token) => {
-    return await fetchWithAuth(`/upload/signed-url?key=${encodeURIComponent(s3Key)}`, {}, token);
-  },
-
-  downloadFile: async (s3Key, token) => {
-    const url = `${apiConfig.baseUrl}/upload/download?key=${encodeURIComponent(s3Key)}`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
     });
+  },
+
+  getFileUploads: async () => {
+    return await fetchWithAuth("/upload/file");
+  },
+
+  getTextUploads: async () => {
+    return await fetchWithAuth("/upload/text");
+  },
+
+  getSignedUrl: async (s3Key) => {
+    return await fetchWithAuth(`/upload/signed-url?key=${encodeURIComponent(s3Key)}`);
+  },
+
+  downloadFile: async (s3Key) => {
+    const url = `${apiConfig.baseUrl}/upload/download?key=${encodeURIComponent(s3Key)}`;
+    const response = await fetch(url, { credentials: "include" });
     if (!response.ok) throw new Error("Download failed");
     return response.blob();
   },
@@ -143,47 +122,47 @@ export const uploadService = {
 // User Service
 // ============================================
 export const userService = {
-  searchUsers: async (query, token) => {
-    return await fetchWithAuth(`/search-users?search=${encodeURIComponent(query)}`, {}, token);
+  searchUsers: async (query) => {
+    return await fetchWithAuth(`/search-users?search=${encodeURIComponent(query)}`);
   },
 
-  searchUsersByRole: async (role, query, token) => {
+  searchUsersByRole: async (role, query) => {
     return await fetchWithAuth(
-      `/search-users?role=${encodeURIComponent(role)}&search=${encodeURIComponent(query)}`, {}, token
+      `/search-users?role=${encodeURIComponent(role)}&search=${encodeURIComponent(query)}`
     );
   },
 
-  getUserById: async (userId, token) => {
-    return await fetchWithAuth(`/search-users/${userId}`, {}, token);
+  getUserById: async (userId) => {
+    return await fetchWithAuth(`/search-users/${userId}`);
   },
 
-  getUserRoles: async (token) => {
-    return await fetchWithAuth("/user-roles", {}, token);
+  getUserRoles: async () => {
+    return await fetchWithAuth("/user-roles");
   },
 
-  getUserRolesById: async (userId, token) => {
-    return await fetchWithAuth(`/user-roles/${userId}`, {}, token);
+  getUserRolesById: async (userId) => {
+    return await fetchWithAuth(`/user-roles/${userId}`);
   },
 
-  updateUserRoles: async (data, token) => {
+  updateUserRoles: async (data) => {
     return await fetchWithAuth("/user-roles", {
       method: "POST",
       body: JSON.stringify(data),
-    }, token);
+    });
   },
 
-  updateUserAttributes: async (data, token) => {
+  updateUserAttributes: async (data) => {
     return await fetchWithAuth("/user/attributes", {
       method: "PUT",
       body: JSON.stringify(data),
-    }, token);
+    });
   },
 
-  changePassword: async (data, token) => {
+  changePassword: async (data) => {
     return await fetchWithAuth("/user/password", {
       method: "PUT",
       body: JSON.stringify(data),
-    }, token);
+    });
   },
 };
 
@@ -191,43 +170,43 @@ export const userService = {
 // Provider Service
 // ============================================
 export const providerService = {
-  getAll: async (token) => {
-    return await fetchWithAuth("/provider", {}, token);
+  getAll: async () => {
+    return await fetchWithAuth("/provider");
   },
 
-  getById: async (id, token) => {
-    return await fetchWithAuth(`/provider/${id}`, {}, token);
+  getById: async (id) => {
+    return await fetchWithAuth(`/provider/${id}`);
   },
 
-  getByUserId: async (token) => {
-    return await fetchWithAuth("/provider", {}, token);
+  getByUserId: async () => {
+    return await fetchWithAuth("/provider");
   },
 
-  create: async (providerData, token) => {
+  create: async (providerData) => {
     return await fetchWithAuth("/provider", {
       method: "POST",
       body: JSON.stringify(providerData),
-    }, token);
+    });
   },
 
-  selectProvider: async (data, token) => {
+  selectProvider: async (data) => {
     return await fetchWithAuth("/provider", {
       method: "POST",
       body: JSON.stringify(data),
-    }, token);
+    });
   },
 
-  update: async (id, providerData, token) => {
+  update: async (id, providerData) => {
     return await fetchWithAuth(`/provider/${id}`, {
       method: "PUT",
       body: JSON.stringify(providerData),
-    }, token);
+    });
   },
 
-  delete: async (id, token) => {
+  delete: async (id) => {
     return await fetchWithAuth(`/provider/${id}`, {
       method: "DELETE",
-    }, token);
+    });
   },
 };
 
@@ -235,32 +214,32 @@ export const providerService = {
 // Patient Service
 // ============================================
 export const patientService = {
-  getAll: async (token) => {
-    return await fetchWithAuth("/patients", {}, token);
+  getAll: async () => {
+    return await fetchWithAuth("/patients");
   },
 
-  getById: async (patientId, token) => {
-    return await fetchWithAuth(`/patients/${patientId}`, {}, token);
+  getById: async (patientId) => {
+    return await fetchWithAuth(`/patients/${patientId}`);
   },
 
-  create: async (patientData, token) => {
+  create: async (patientData) => {
     return await fetchWithAuth("/patients", {
       method: "POST",
       body: JSON.stringify(patientData),
-    }, token);
+    });
   },
 
-  update: async (patientId, patientData, token) => {
+  update: async (patientId, patientData) => {
     return await fetchWithAuth(`/patients/${patientId}`, {
       method: "PUT",
       body: JSON.stringify(patientData),
-    }, token);
+    });
   },
 
-  delete: async (patientId, token) => {
+  delete: async (patientId) => {
     return await fetchWithAuth(`/patients/${patientId}`, {
       method: "DELETE",
-    }, token);
+    });
   },
 };
 

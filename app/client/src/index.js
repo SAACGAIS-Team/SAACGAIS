@@ -2,8 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App.js';
-import { AuthProvider } from "react-oidc-context";
-import { cognitoAuthConfig } from "./cognitoAuthConfig.js";
+import { AuthProvider } from "./context/AuthContext.js";
 import { ThemeProvider } from "./context/ThemeContext.js";
 
 window.addEventListener('error', (e) => {
@@ -15,7 +14,7 @@ window.addEventListener('error', (e) => {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <AuthProvider {...cognitoAuthConfig}>
+    <AuthProvider>
       <ThemeProvider>
         <App />
       </ThemeProvider>
