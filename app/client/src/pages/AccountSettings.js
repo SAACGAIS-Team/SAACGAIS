@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Box, Typography, TextField, Button, Alert, Chip, Paper, Divider } from "@mui/material";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../context/AuthContext.js";
 import { userService } from "../api.js";
+import PageCard from "../components/PageCard.js";
 
 export default function AccountSettings() {
-  const auth = useAuth();
-  const userGroups = auth.user?.profile?.["cognito:groups"] || [];
+  const { user, refreshUser } = useAuth();
+  const userGroups = user?.groups || [];
 
   const [nameForm, setNameForm] = useState({
-    given_name: auth.user?.profile?.given_name || "",
-    family_name: auth.user?.profile?.family_name || "",
+    given_name: user?.given_name || "",
+    family_name: user?.family_name || "",
   });
   const [nameSuccess, setNameSuccess] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -26,14 +27,14 @@ export default function AccountSettings() {
     setNameSuccess(false);
     setNameError("");
     try {
-        await userService.updateUserAttributes({
+      await userService.updateUserAttributes({
         given_name: nameForm.given_name,
         family_name: nameForm.family_name,
-        }, auth.user?.id_token);
-        await auth.signinSilent(); // refreshes token so navbar name updates immediately
-        setNameSuccess(true);
+      });
+      await refreshUser(); // re-fetch /auth/me so navbar name updates immediately
+      setNameSuccess(true);
     } catch (err) {
-        setNameError(err.message || "Failed to update name. Please try again.");
+      setNameError(err.message || "Failed to update name. Please try again.");
     }
   };
 
@@ -42,22 +43,22 @@ export default function AccountSettings() {
     setPasswordError("");
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-        setPasswordError("New passwords do not match.");
-        return;
+      setPasswordError("New passwords do not match.");
+      return;
     }
     if (passwordForm.newPassword.length < 8) {
-        setPasswordError("Password must be at least 8 characters.");
-        return;
+      setPasswordError("Password must be at least 8 characters.");
+      return;
     }
     try {
-        await userService.changePassword({
+      await userService.changePassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
-        }, auth.user?.id_token);
-        setPasswordSuccess(true);
-        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      });
+      setPasswordSuccess(true);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
-        setPasswordError(err.message || "Failed to update password. Please try again.");
+      setPasswordError(err.message || "Failed to update password. Please try again.");
     }
   };
 
@@ -70,7 +71,7 @@ export default function AccountSettings() {
   };
 
   return (
-    <Box sx={{ maxWidth: 600, mx: "auto", mt: 6, px: 2, pb: 6 }}>
+    <PageCard maxWidth={600}>
       <Typography variant="h5" fontWeight={500} mb={1}>
         Account Settings
       </Typography>
@@ -102,7 +103,7 @@ export default function AccountSettings() {
           Name & Email
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2}>
-          Email: {auth.user?.profile?.email}
+          Email: {user?.email}
         </Typography>
         <Divider sx={{ mb: 2 }} />
         <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
@@ -111,18 +112,14 @@ export default function AccountSettings() {
             size="small"
             fullWidth
             value={nameForm.given_name}
-            onChange={(e) =>
-              setNameForm({ ...nameForm, given_name: e.target.value })
-            }
+            onChange={(e) => setNameForm({ ...nameForm, given_name: e.target.value })}
           />
           <TextField
             label="Last name"
             size="small"
             fullWidth
             value={nameForm.family_name}
-            onChange={(e) =>
-              setNameForm({ ...nameForm, family_name: e.target.value })
-            }
+            onChange={(e) => setNameForm({ ...nameForm, family_name: e.target.value })}
           />
         </Box>
         {nameSuccess && (
@@ -156,9 +153,7 @@ export default function AccountSettings() {
             size="small"
             fullWidth
             value={passwordForm.currentPassword}
-            onChange={(e) =>
-              setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
-            }
+            onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
           />
           <TextField
             label="New password"
@@ -166,9 +161,7 @@ export default function AccountSettings() {
             size="small"
             fullWidth
             value={passwordForm.newPassword}
-            onChange={(e) =>
-              setPasswordForm({ ...passwordForm, newPassword: e.target.value })
-            }
+            onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
           />
           <TextField
             label="Confirm new password"
@@ -176,9 +169,7 @@ export default function AccountSettings() {
             size="small"
             fullWidth
             value={passwordForm.confirmPassword}
-            onChange={(e) =>
-              setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
-            }
+            onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
           />
         </Box>
         {passwordSuccess && (
@@ -195,6 +186,6 @@ export default function AccountSettings() {
           Update password
         </Button>
       </Paper>
-    </Box>
+    </PageCard>
   );
 }

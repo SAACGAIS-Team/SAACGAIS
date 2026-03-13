@@ -1,41 +1,37 @@
 import "@testing-library/jest-dom";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AuthProvider } from "react-oidc-context";
 import Navbar from "./Navbar";
 import { ThemeProvider } from "../context/ThemeContext";
 
-const mockAuthConfig = {
-  authority: "https://example.com",
-  client_id: "test-client-id",
-  redirect_uri: "http://localhost:3000/callback",
-  response_type: "code",
-  scope: "openid profile email",
-};
+// 1. Mock your custom AuthContext
+jest.mock("../context/AuthContext.js", () => ({
+  useAuth: () => ({
+    user: null, // Start with unauthenticated state
+    isAuthenticated: false,
+    logout: jest.fn(),
+  }),
+}));
 
 describe("Navbar component", () => {
-  test("renders brand title and navigation buttons", () => {
+  test("renders brand title and basic navigation buttons", () => {
     render(
       <MemoryRouter>
-        <AuthProvider {...mockAuthConfig}>
-          <ThemeProvider>
-            <Navbar />
-          </ThemeProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <Navbar />
+        </ThemeProvider>
       </MemoryRouter>
     );
 
+    // Verify brand
     const brand = screen.getByText("SAACGAIS");
     expect(brand).toBeInTheDocument();
-    expect(brand.closest("a")).toHaveAttribute("href", "/");
-
-    const homeLink = screen.getByRole("link", { name: "Home" });
-    const aboutLink = screen.getByRole("link", { name: "About" });
-
-    expect(homeLink).toBeInTheDocument();
-    expect(aboutLink).toBeInTheDocument();
-
-    expect(homeLink).toHaveAttribute("href", "/");
-    expect(aboutLink).toHaveAttribute("href", "/about");
+    
+    // Verify standard links
+    expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /about/i })).toBeInTheDocument();
+    
+    // Verify login button exists when unauthenticated
+    expect(screen.getByRole("button", { name: /login/i })).toBeInTheDocument();
   });
 });

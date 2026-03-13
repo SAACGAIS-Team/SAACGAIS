@@ -1,32 +1,30 @@
 import { CognitoJwtVerifier } from "aws-jwt-verify";
-import dotenv from "dotenv";
 
-dotenv.config();
+let verifier = null;
 
-const verifier = CognitoJwtVerifier.create({
-  userPoolId: process.env.AWS_COGNITO_USER_POOL_ID,
-  tokenUse: "id",
-  clientId: process.env.AWS_COGNITO_CLIENT_ID,
-});
+function getVerifier() {
+  if (!verifier) {
+    verifier = CognitoJwtVerifier.create({
+      userPoolId: process.env.AWS_COGNITO_USER_POOL_ID,
+      tokenUse: "access",
+      clientId: process.env.AWS_COGNITO_CLIENT_ID,
+    });
+  }
+  return verifier;
+}
 
 export default async function authenticate(req, res, next) {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = req.cookies?.access_token;
 
   if (!token) {
-    return res.status(401).json({ error: "No token provided" });
+    return res.status(401).json({ error: "Unauthorized." });
   }
 
   try {
-    const decoded = await verifier.verify(token);
-
-    req.user = {
-      sub: decoded.sub,
-      roles: decoded["cognito:groups"] || [],
-    };
-
+    const payload = await getVerifier().verify(token);
+    req.user = payload;
     next();
   } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(401).json({ error: "Unauthorized: invalid or expired token." });
   }
 }

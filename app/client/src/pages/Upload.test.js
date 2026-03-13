@@ -4,7 +4,7 @@ import "@testing-library/jest-dom";
 import Upload from "./Upload";
 import { uploadService } from "../api.js";
 
-// Mock the API service
+// 1. Mock the API service
 jest.mock("../api.js", () => ({
   uploadService: {
     getFileUploads: jest.fn(),
@@ -14,9 +14,10 @@ jest.mock("../api.js", () => ({
   },
 }));
 
-// Mock Auth
-jest.mock("react-oidc-context", () => ({
+// 2. Mock your local AuthContext instead of the external library
+jest.mock("../context/AuthContext.js", () => ({
   useAuth: () => ({
+    isAuthenticated: true,
     user: { id_token: "mock-token" },
   }),
 }));
@@ -38,7 +39,6 @@ describe("Upload component", () => {
   });
 
   test("uploads files and displays success message", async () => {
-    // Setup specific success response
     uploadService.uploadFiles.mockResolvedValueOnce({ ok: true });
     
     await act(async () => {
@@ -58,7 +58,6 @@ describe("Upload component", () => {
       fireEvent.click(uploadButton);
     });
 
-    // Wait for the success message to appear
     const successMessage = await screen.findByText(/1 file\(s\) uploaded successfully/i);
     expect(successMessage).toBeInTheDocument();
   });
