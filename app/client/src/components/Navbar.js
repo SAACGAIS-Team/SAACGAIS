@@ -115,7 +115,7 @@ export default function Navbar() {
             </Button>
           )}
 
-          {(userGroups.includes("Patient") || userGroups.includes("Provider")) && (
+          {(userGroups.includes("Patient") || userGroups.includes("Healthcare-Provider")) && (
             <Button color="inherit" component={Link} to="/chat" sx={{ color: "white" }}>
               Chat
             </Button>

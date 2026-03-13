@@ -65,7 +65,7 @@ function App() {
         <Route
           path="/chat"
           element={
-            <ProtectedRoute allowedGroups={["Patient", "Provider"]}>
+            <ProtectedRoute allowedGroups={["Patient", "Healthcare-Provider"]}>
               <Chat />
             </ProtectedRoute>
           }

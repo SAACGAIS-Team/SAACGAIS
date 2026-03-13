@@ -5,8 +5,9 @@ import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
 
+// GET /api/provider — get current provider selection (patient view)
 router.get("/", async (req, res) => {
-    const userId = req.user.sub; // was: const { user } = req.query
+    const userId = req.user.sub;
 
     try {
         const { data, error } = await supabase.rpc("Get_Provider_Selection", {
@@ -25,8 +26,9 @@ router.get("/", async (req, res) => {
     }
 });
 
+// POST /api/provider — set provider selection (patient view)
 router.post("/", async (req, res) => {
-    const userId = req.user.sub; // was: const { userId, providerId } = req.body
+    const userId = req.user.sub;
     const { providerId } = req.body;
 
     if (!providerId) {
@@ -60,5 +62,30 @@ router.post("/", async (req, res) => {
     }
 });
 
+// GET /api/provider/patients — get all patients for the authenticated provider
+router.get("/patients", async (req, res) => {
+    const providerUid = req.user.sub;
+    const userRoles = req.user.roles || [];
+
+    if (!userRoles.includes("Healthcare-Provider")) {
+        return res.status(403).json({ error: "Only providers can access this endpoint" });
+    }
+
+    try {
+        const { data, error } = await supabase.rpc("get_provider_patients", {
+            provider_uid: providerUid,
+        });
+
+        if (error) {
+            console.error("Supabase error:", error);
+            return res.status(500).json({ error: error.message });
+        }
+
+        res.json({ ok: true, patients: data });
+    } catch (err) {
+        console.error("Error fetching provider patients:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 export default router;
