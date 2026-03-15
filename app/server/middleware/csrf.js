@@ -16,14 +16,13 @@ export default function csrfCheck(req, res, next) {
   if (process.env.NODE_ENV === 'test') {
     return next();
   }
-  
-  if (["POST", "PUT", "DELETE"].includes(req.method)) {
-    const clientToken = req.headers["x-csrf-token"];
-    const cookieToken = req.cookies["XSRF-TOKEN"];
 
-    if (!clientToken || clientToken !== cookieToken) {
-      return res.status(403).json({ error: "Invalid CSRF token" });
-    }
+  const clientToken = req.headers["x-csrf-token"];
+  const cookieToken = req.cookies["XSRF-TOKEN"];
+
+  if (!clientToken || clientToken !== cookieToken) {
+    return res.status(403).json({ error: "Invalid CSRF token" });
   }
+
   next();
 }

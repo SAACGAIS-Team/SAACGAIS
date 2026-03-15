@@ -10,7 +10,7 @@ export const apiConfig = {
     searchUsers: "/search-users",
     userRoles: "/user-roles",
     provider: "/provider",
-    patients: "/patients",
+    patients: "/provider/patients",
   },
   
   timeout: 10000,

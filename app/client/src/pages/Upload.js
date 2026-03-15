@@ -8,6 +8,9 @@ import { uploadService } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
 import PageCard from "../components/PageCard.js";
 
+const ALLOWED_EXTENSIONS = ".pdf,.txt,.md,.csv,.json,.xml,.html";
+const ALLOWED_LABEL = "PDF, TXT, MD, CSV, JSON, XML, HTML (max 10MB)";
+
 export default function Upload() {
   const { isAuthenticated } = useAuth();
 
@@ -22,7 +25,6 @@ export default function Upload() {
   const [textHistory, setTextHistory] = useState([]);
 
   const [downloadingKey, setDownloadingKey] = useState(null);
-
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   const showFileMessage = (type, text) => {
@@ -48,10 +50,9 @@ export default function Upload() {
       } catch (err) {
         console.error("Error fetching upload history:", err);
       } finally {
-        setLoadingHistory(false); // Stop loading
+        setLoadingHistory(false);
       }
     };
-
     if (isAuthenticated) fetchHistory();
   }, [isAuthenticated]);
 
@@ -72,7 +73,6 @@ export default function Upload() {
     if (selectedFiles.length === 0) return;
     setFileLoading(true);
     setFileMessage(null);
-
     try {
       await uploadService.uploadFiles(selectedFiles);
       showFileMessage("success", `${selectedFiles.length} file(s) uploaded successfully`);
@@ -90,7 +90,6 @@ export default function Upload() {
     if (!text.trim()) return;
     setTextLoading(true);
     setTextMessage(null);
-
     try {
       await uploadService.uploadText(text);
       showTextMessage("success", "Text saved successfully");
@@ -138,11 +137,15 @@ export default function Upload() {
         {/* File Upload Section */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           <Typography variant="h6" gutterBottom>File Upload</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+            Allowed: {ALLOWED_LABEL}
+          </Typography>
           <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, mb: 2 }}>
             <input
               type="file"
               id="file-upload"
               multiple
+              accept={ALLOWED_EXTENSIONS}
               style={{ display: "none" }}
               onChange={handleFileSelect}
             />
@@ -175,7 +178,7 @@ export default function Upload() {
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>File History</Typography>
           {loadingHistory ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
               <CircularProgress size={24} />
             </Box>
           ) : fileHistory.length === 0 ? (
@@ -236,10 +239,10 @@ export default function Upload() {
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>Text History</Typography>
           {loadingHistory ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : textHistory.length === 0 ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : textHistory.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No text uploaded yet.</Typography>
           ) : (
             <List dense>

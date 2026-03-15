@@ -15,9 +15,14 @@ export function AuthProvider({ children }) {
     if (isLoggingOut) return;
 
     try {
-      const res = await fetch(`${API}/auth/me`, {
+      const timestamp = new Date().getTime();
+      const res = await fetch(`${API}/auth/me?t=${timestamp}`, {
         credentials: "include",
-        headers: { "Cache-Control": "no-store" }
+        headers: { 
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0"
+        }
       });
 
       // Handle Token Expiration and Refresh

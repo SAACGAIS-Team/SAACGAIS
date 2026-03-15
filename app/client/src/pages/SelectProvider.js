@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Box, TextField, Button, Typography, CircularProgress, Autocomplete, Alert } from "@mui/material";
 import { useAuth } from "../context/AuthContext.js";
-import { providerService, userService } from "../api.js";
+import { userService, patientService } from "../api.js";
 import ConfirmationDialog from "../components/ConfirmationDialog.js";
 import PageCard from "../components/PageCard.js";
 
@@ -30,7 +30,7 @@ function SelectProvider() {
       try {
         setLoadingCurrentProvider(true);
         if (!user?.sub) { setLoadingCurrentProvider(false); setCurrentProvider(null); return; }
-        const response = await providerService.getByUserId();
+        const response = await patientService.getByUserId();
         if (response.ok && response.data?.Provider_UID) {
           const providerInfo = await userService.getUserById(response.data.Provider_UID);
           setCurrentProvider({ ...providerInfo, selectionTime: response.data.Selection_Time });
@@ -70,7 +70,7 @@ function SelectProvider() {
     setMessage(null);
     try {
       if (!user?.sub) { showMessage("error", "User not authenticated"); return; }
-      await providerService.selectProvider({ providerId: selected.sub });
+      await patientService.selectProvider({ providerId: selected.sub });
       showMessage("success", "Provider updated successfully!");
       setCurrentProvider({ ...selected, selectionTime: new Date().toISOString() });
       setSelected(null); setInput(""); setConfirmOpen(false);

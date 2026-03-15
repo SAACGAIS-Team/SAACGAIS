@@ -1,6 +1,3 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import helmet from "helmet";
 import cors from "cors";
 import express from "express";

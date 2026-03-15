@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Box, TextField, Button, Typography, CircularProgress, Autocomplete, Alert, FormControl, InputLabel, Select, MenuItem, Chip, OutlinedInput } from "@mui/material";
 import { useAuth } from "../context/AuthContext.js";
-import { triggerRoleUpdate } from "../utils/roleUpdateEvent.js";
 import { userService } from "../api.js";
 import PageCard from "../components/PageCard.js";
 
@@ -17,7 +16,7 @@ function ChangeRole() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
   const [roles, setRoles] = useState([]);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -77,13 +76,20 @@ function ChangeRole() {
     if (!selected || selectedRoles.length === 0) return;
     setSubmitting(true);
     setMessage(null);
+
     try {
-      const adminUserId = user?.sub;
-      if (!adminUserId) { showMessage("error", "User not authenticated"); return; }
-      await userService.updateUserRoles({ targetUserId: selected.sub, newRoles: selectedRoles });
+      await userService.updateUserRoles({ 
+        targetUserId: selected.sub, 
+        newRoles: selectedRoles 
+      });
+
+      // Update local UI immediately
       setCurrentRoles(selectedRoles);
-      showMessage("success", `Successfully updated ${selected.firstName} ${selected.lastName}'s roles`);
-      if (selected.sub === adminUserId) setTimeout(() => triggerRoleUpdate(selected.sub), 100);
+      showMessage("success", `Successfully updated ${selected.firstName}'s roles`);
+
+      if (selected.sub === user?.sub) {
+        await refreshUser(); 
+      }
     } catch (err) {
       showMessage("error", err.response?.data?.error || err.message);
     } finally {
