@@ -4,66 +4,62 @@ jest.mock('./middleware/authenticate.js', () => {
   return (req, res, next) => {
     req.user = {
       sub: 'test-user-123',
-      roles: ['Admin'],
+      roles: ['Admin', 'Healthcare-Provider'],
     };
     next();
   };
 });
 
-// Mock Supabase BEFORE any imports that use it
 jest.mock('./db.js', () => ({
-  supabase: {
-    from: jest.fn(() => ({
-      select: jest.fn(() => Promise.resolve({ data: [], error: null })),
-      insert: jest.fn(() => Promise.resolve({ data: [], error: null })),
-      update: jest.fn(() => Promise.resolve({ data: [], error: null })),
-      delete: jest.fn(() => Promise.resolve({ data: [], error: null })),
-    })),
+  default: {
+    rpc: jest.fn(() => Promise.resolve({ data: [], error: null })),
   },
 }));
 
-// Mock the Cognito configuration BEFORE importing the app
-jest.mock('./config/cognito.js', () => ({
-  cognito: {
-    listGroups: jest.fn(() => ({
-      promise: jest.fn(() => Promise.resolve({
-        Groups: [
-          {
-            GroupName: 'Admin',
-            Description: 'Administrator role',
-            CreationDate: new Date('2024-01-01'),
-            LastModifiedDate: new Date('2024-01-01')
-          },
-          {
-            GroupName: 'User',
-            Description: 'Standard user role',
-            CreationDate: new Date('2024-01-01'),
-            LastModifiedDate: new Date('2024-01-01')
-          },
-          {
-            GroupName: 'Provider',
-            Description: 'Provider role',
-            CreationDate: new Date('2024-01-01'),
-            LastModifiedDate: new Date('2024-01-01')
-          }
-        ]
-      }))
-    })),
-    adminListGroupsForUser: jest.fn(() => ({
-      promise: jest.fn(() => Promise.resolve({
-        Groups: [
-          { GroupName: 'User' }
-        ]
-      }))
-    })),
-    adminRemoveUserFromGroup: jest.fn(() => ({
-      promise: jest.fn(() => Promise.resolve({}))
-    })),
-    adminAddUserToGroup: jest.fn(() => ({
-      promise: jest.fn(() => Promise.resolve({}))
-    }))
-  },
-  USER_POOL_ID: 'test-user-pool-id'
+jest.mock('./services/cognitoService.js', () => ({
+  listGroups: jest.fn(() => Promise.resolve([
+    { GroupName: 'Admin', Description: 'Administrator role', CreationDate: new Date('2024-01-01'), LastModifiedDate: new Date('2024-01-01') },
+    { GroupName: 'User', Description: 'Standard user role', CreationDate: new Date('2024-01-01'), LastModifiedDate: new Date('2024-01-01') },
+    { GroupName: 'Healthcare-Provider', Description: 'Provider role', CreationDate: new Date('2024-01-01'), LastModifiedDate: new Date('2024-01-01') },
+  ])),
+  getUserGroups: jest.fn(() => Promise.resolve(['User'])),
+  setUserGroups: jest.fn(() => Promise.resolve()),
+  getUserById: jest.fn(() => Promise.resolve({
+    sub: 'test-user-123',
+    firstName: 'Test',
+    lastName: 'User',
+    email: 'test@example.com',
+    phone: null,
+    birthdate: null,
+  })),
+  updateUserAttributes: jest.fn(() => Promise.resolve()),
+  verifyPassword: jest.fn(() => Promise.resolve()),
+  setUserPassword: jest.fn(() => Promise.resolve()),
+  sendCommand: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('./services/supabaseService.js', () => ({
+  getProviderSelection: jest.fn(() => Promise.resolve(null)),
+  deleteProviderSelection: jest.fn(() => Promise.resolve()),
+  insertProviderSelection: jest.fn(() => Promise.resolve({})),
+  getProviderPatients: jest.fn(() => Promise.resolve([])),
+  getFileUploads: jest.fn(() => Promise.resolve([])),
+  insertFileUpload: jest.fn(() => Promise.resolve()),
+  getTextUploads: jest.fn(() => Promise.resolve([])),
+  insertTextUpload: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+  getDocument: jest.fn(() => ({
+    promise: Promise.resolve({
+      numPages: 1,
+      getPage: jest.fn(() => Promise.resolve({
+        getTextContent: jest.fn(() => Promise.resolve({
+          items: [{ str: 'mock pdf text' }],
+        })),
+      })),
+    }),
+  })),
 }));
 
 import app from './index.js';
@@ -76,12 +72,12 @@ describe('Test routes', () => {
     agent = request.agent(app);
     const res = await agent.get('/api/auth/csrf-token');
     const cookies = res.headers['set-cookie'];
-    
+
     if (cookies) {
       agent.jar.setCookie(cookies[0], 'http://localhost:3001');
     }
-    
-    csrfToken = res.body.csrfToken; 
+
+    csrfToken = res.body.csrfToken;
   });
 
   test('Basic test to ensure Jest is working', () => {
@@ -111,9 +107,9 @@ describe('Test routes', () => {
       .send({
         adminUserId: 'admin-123',
         targetUserId: 'user-456',
-        newRoles: ['Admin', 'Provider']
+        newRoles: ['Admin', 'Healthcare-Provider'],
       });
-    
+
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
   });
@@ -122,9 +118,9 @@ describe('Test routes', () => {
     const res = await agent
       .post('/api/user-roles')
       .send({
-        adminUserId: 'admin-123'
+        adminUserId: 'admin-123',
       });
-    
+
     expect(res.statusCode).toBe(400);
     expect(res.body).toHaveProperty('error');
   });

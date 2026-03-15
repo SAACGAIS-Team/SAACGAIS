@@ -49,6 +49,9 @@
     "transform": {
       "^.+\\.(js|jsx|mjs)$": "babel-jest"
     },
+    "moduleNameMapper": {
+      "pdfjs-dist/legacy/build/pdf.mjs": "<rootDir>/__mocks__/pdfjs-dist.js"
+    },
     "transformIgnorePatterns": [
       "node_modules/(?!(@aws-sdk|uuid)/)"
     ]
