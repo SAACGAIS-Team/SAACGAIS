@@ -11,30 +11,15 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useThemeMode } from "../context/ThemeContext.js";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
-import { listenForRoleUpdates } from "../utils/roleUpdateEvent.js";
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout, refreshUser } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const { darkMode, setDarkMode } = useThemeMode();
   const menuRef = useRef(null);
 
   const userGroups = user?.groups || [];
-
-  // Listen for role update events — re-fetch /auth/me to get updated groups
-  useEffect(() => {
-    const handleRoleUpdate = async () => {
-      try {
-        await refreshUser();
-      } catch (err) {
-        console.error("Error refreshing user:", err);
-      }
-    };
-
-    const cleanup = listenForRoleUpdates(handleRoleUpdate);
-    return cleanup;
-  }, [refreshUser]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -106,9 +91,9 @@ export default function Navbar() {
             </Button>
           )}
 
-          {(userGroups.includes("Patient") || userGroups.includes("Healthcare-Provider")) && (
-            <Button color="inherit" component={Link} to="/chat" sx={{ color: "white" }}>
-              Chat
+          {(userGroups.includes("Healthcare-Provider")) && (
+            <Button color="inherit" component={Link} to="/provider-chat" sx={{ color: "white" }}>
+              Provider Chat
             </Button>
           )}
 

@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "start": "node -r dotenv/config index.js",
     "test": "cross-env NODE_ENV=test jest --ci",
     "lint": "npx eslint ."
   },
@@ -29,6 +29,7 @@
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.4.5",
     "multer": "^2.0.2",
+    "pdfjs-dist": "^5.5.207",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

@@ -1,7 +1,6 @@
 import express from "express";
 import crypto from "crypto";
 import {
-  CognitoIdentityProviderClient,
   InitiateAuthCommand,
   SignUpCommand,
   ConfirmSignUpCommand,
@@ -9,20 +8,9 @@ import {
   GetUserCommand,
   ResendConfirmationCodeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
+import * as cognito from "../services/cognitoService.js";
 
 const router = express.Router();
-
-// Lazy initialization to avoid ESM hoisting issue where env vars
-// are not loaded yet when the module is first evaluated.
-let _cognitoClient = null;
-function getCognitoClient() {
-  if (!_cognitoClient) {
-    _cognitoClient = new CognitoIdentityProviderClient({
-      region: process.env.AWS_COGNITO_REGION || "us-east-2",
-    });
-  }
-  return _cognitoClient;
-}
 
 function getClientId() {
   return process.env.AWS_COGNITO_CLIENT_ID;
@@ -32,18 +20,15 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict",
-  maxAge: 60 * 60 * 1000, // 1 hour
+  maxAge: 60 * 60 * 1000,
   path: "/",
 };
 
 const REFRESH_COOKIE_OPTIONS = {
   ...COOKIE_OPTIONS,
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  maxAge: 30 * 24 * 60 * 60 * 1000,
 };
 
-// Must exactly match COOKIE_OPTIONS (minus maxAge) for clearCookie to work.
-// Any mismatch in sameSite, secure, httpOnly, or path means the browser
-// won't recognize them as the same cookie and won't clear them.
 const CLEAR_OPTIONS = {
   path: "/",
   httpOnly: true,
@@ -63,17 +48,13 @@ router.post("/login", async (req, res) => {
     const command = new InitiateAuthCommand({
       AuthFlow: "USER_PASSWORD_AUTH",
       ClientId: getClientId(),
-      AuthParameters: {
-        USERNAME: email,
-        PASSWORD: password,
-      },
+      AuthParameters: { USERNAME: email, PASSWORD: password },
     });
 
-    const response = await getCognitoClient().send(command);
+    const response = await cognito.sendCommand(command);
     const { AuthenticationResult } = response;
 
     if (!AuthenticationResult) {
-      // Handle challenges (e.g. NEW_PASSWORD_REQUIRED)
       return res.status(200).json({
         challenge: response.ChallengeName,
         session: response.Session,
@@ -84,36 +65,23 @@ router.post("/login", async (req, res) => {
     res.cookie("id_token", AuthenticationResult.IdToken, COOKIE_OPTIONS);
     res.cookie("refresh_token", AuthenticationResult.RefreshToken, REFRESH_COOKIE_OPTIONS);
 
-    // Fetch user profile
-    const userCommand = new GetUserCommand({
-      AccessToken: AuthenticationResult.AccessToken,
-    });
-    const userResponse = await getCognitoClient().send(userCommand);
-    const attrs = Object.fromEntries(
-      userResponse.UserAttributes.map((a) => [a.Name, a.Value])
-    );
+    const userCommand = new GetUserCommand({ AccessToken: AuthenticationResult.AccessToken });
+    const userResponse = await cognito.sendCommand(userCommand);
+    const attrs = Object.fromEntries(userResponse.UserAttributes.map((a) => [a.Name, a.Value]));
 
     return res.status(200).json({
       user: {
         email: attrs.email,
         given_name: attrs.given_name,
         family_name: attrs.family_name,
-        groups: [], // groups come from the ID token — parsed client-side or via a separate admin call
+        groups: [],
       },
     });
   } catch (err) {
     console.error("Login error:", err);
-
-    if (err.name === "NotAuthorizedException") {
-      return res.status(401).json({ error: "Incorrect email or password." });
-    }
-    if (err.name === "UserNotConfirmedException") {
-      return res.status(403).json({ error: "USER_NOT_CONFIRMED", email });
-    }
-    if (err.name === "UserNotFoundException") {
-      return res.status(401).json({ error: "Incorrect email or password." });
-    }
-
+    if (err.name === "NotAuthorizedException") return res.status(401).json({ error: "Incorrect email or password." });
+    if (err.name === "UserNotConfirmedException") return res.status(403).json({ error: "USER_NOT_CONFIRMED", email });
+    if (err.name === "UserNotFoundException") return res.status(401).json({ error: "Incorrect email or password." });
     return res.status(500).json({ error: "Login failed. Please try again." });
   }
 });
@@ -126,15 +94,11 @@ router.post("/signup", async (req, res) => {
     return res.status(400).json({ error: "All fields are required." });
   }
 
-  // Validate birthdate format YYYY-MM-DD (Cognito requirement)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) {
     return res.status(400).json({ error: "Birthdate must be in YYYY-MM-DD format." });
   }
 
-  // phone_number arrives pre-assembled from the frontend as E.164
-  // (country code dropdown + digits). Strip whitespace and validate.
   const normalizedPhone = phone_number.replace(/\s+/g, "");
-
   if (!/^\+\d{7,15}$/.test(normalizedPhone)) {
     return res.status(400).json({ error: "Invalid phone number. Must be in E.164 format (e.g. +15551234567)." });
   }
@@ -153,7 +117,7 @@ router.post("/signup", async (req, res) => {
       ],
     });
 
-    await getCognitoClient().send(command);
+    await cognito.sendCommand(command);
 
     return res.status(200).json({
       message: "Signup successful. Check your email for a verification code.",
@@ -161,17 +125,9 @@ router.post("/signup", async (req, res) => {
     });
   } catch (err) {
     console.error("Signup error:", err);
-
-    if (err.name === "UsernameExistsException") {
-      return res.status(409).json({ error: "An account with this email already exists." });
-    }
-    if (err.name === "InvalidPasswordException") {
-      return res.status(400).json({ error: err.message });
-    }
-    if (err.name === "InvalidParameterException") {
-      return res.status(400).json({ error: err.message });
-    }
-
+    if (err.name === "UsernameExistsException") return res.status(409).json({ error: "An account with this email already exists." });
+    if (err.name === "InvalidPasswordException") return res.status(400).json({ error: err.message });
+    if (err.name === "InvalidParameterException") return res.status(400).json({ error: err.message });
     return res.status(500).json({ error: "Signup failed. Please try again." });
   }
 });
@@ -191,19 +147,12 @@ router.post("/confirm", async (req, res) => {
       ConfirmationCode: code,
     });
 
-    await getCognitoClient().send(command);
-
+    await cognito.sendCommand(command);
     return res.status(200).json({ message: "Email confirmed. You can now log in." });
   } catch (err) {
     console.error("Confirm error:", err);
-
-    if (err.name === "CodeMismatchException") {
-      return res.status(400).json({ error: "Invalid verification code." });
-    }
-    if (err.name === "ExpiredCodeException") {
-      return res.status(400).json({ error: "Code expired. Please request a new one." });
-    }
-
+    if (err.name === "CodeMismatchException") return res.status(400).json({ error: "Invalid verification code." });
+    if (err.name === "ExpiredCodeException") return res.status(400).json({ error: "Code expired. Please request a new one." });
     return res.status(500).json({ error: "Confirmation failed. Please try again." });
   }
 });
@@ -212,9 +161,7 @@ router.post("/confirm", async (req, res) => {
 router.post("/resend-code", async (req, res) => {
   const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: "Email is required." });
-  }
+  if (!email) return res.status(400).json({ error: "Email is required." });
 
   try {
     const command = new ResendConfirmationCodeCommand({
@@ -222,8 +169,7 @@ router.post("/resend-code", async (req, res) => {
       Username: email,
     });
 
-    await getCognitoClient().send(command);
-
+    await cognito.sendCommand(command);
     return res.status(200).json({ message: "Verification code resent." });
   } catch (err) {
     console.error("Resend error:", err);
@@ -234,21 +180,16 @@ router.post("/resend-code", async (req, res) => {
 // POST /auth/refresh
 router.post("/refresh", async (req, res) => {
   const refreshToken = req.cookies?.refresh_token;
-
-  if (!refreshToken) {
-    return res.status(401).json({ error: "No refresh token." });
-  }
+  if (!refreshToken) return res.status(401).json({ error: "No refresh token." });
 
   try {
     const command = new InitiateAuthCommand({
       AuthFlow: "REFRESH_TOKEN_AUTH",
       ClientId: getClientId(),
-      AuthParameters: {
-        REFRESH_TOKEN: refreshToken,
-      },
+      AuthParameters: { REFRESH_TOKEN: refreshToken },
     });
 
-    const response = await getCognitoClient().send(command);
+    const response = await cognito.sendCommand(command);
     const { AuthenticationResult } = response;
 
     res.cookie("access_token", AuthenticationResult.AccessToken, COOKIE_OPTIONS);
@@ -267,27 +208,27 @@ router.post("/refresh", async (req, res) => {
 // GET /auth/me
 router.get("/me", async (req, res) => {
   const accessToken = req.cookies?.access_token;
-
-  if (!accessToken) {
-    return res.status(401).json({ error: "Not authenticated." });
-  }
+  if (!accessToken) return res.status(401).json({ error: "Not authenticated." });
 
   try {
     const command = new GetUserCommand({ AccessToken: accessToken });
-    const response = await getCognitoClient().send(command);
+    const response = await cognito.sendCommand(command);
+    const attrs = Object.fromEntries(response.UserAttributes.map((a) => [a.Name, a.Value]));
 
-    const attrs = Object.fromEntries(
-      response.UserAttributes.map((a) => [a.Name, a.Value])
-    );
-
-    // Parse groups from ID token
-    const idToken = req.cookies?.id_token;
     let groups = [];
-    if (idToken) {
-      try {
-        const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64url").toString());
-        groups = payload["cognito:groups"] || [];
-      } catch {}
+    try {
+      groups = await cognito.getUserGroups(attrs.sub);
+    } catch (gErr) {
+      console.error("getUserGroups failed, falling back to ID token:", gErr);
+      const idToken = req.cookies?.id_token;
+      if (idToken) {
+        try {
+          const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64url").toString());
+          groups = payload["cognito:groups"] || [];
+        } catch (parseErr) {
+          console.error("Failed to parse ID token for fallback:", parseErr);
+        }
+      }
     }
 
     return res.status(200).json({
@@ -300,13 +241,7 @@ router.get("/me", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Me error:", err);
-
-    // Try to refresh if access token is expired
-    if (err.name === "NotAuthorizedException") {
-      return res.status(401).json({ error: "Token expired.", code: "TOKEN_EXPIRED" });
-    }
-
+    if (err.name === "NotAuthorizedException") return res.status(401).json({ error: "Token expired.", code: "TOKEN_EXPIRED" });
     return res.status(401).json({ error: "Not authenticated." });
   }
 });
@@ -318,7 +253,7 @@ router.post("/logout", async (req, res) => {
   if (accessToken) {
     try {
       const command = new GlobalSignOutCommand({ AccessToken: accessToken });
-      await getCognitoClient().send(command);
+      await cognito.sendCommand(command);
     } catch (err) {
       console.warn("GlobalSignOut failed (token may already be expired):", err.message);
     }
@@ -336,7 +271,7 @@ router.post("/logout", async (req, res) => {
 router.get("/csrf-token", (req, res) => {
   const csrfToken = crypto.randomBytes(32).toString("hex");
   res.cookie("XSRF-TOKEN", csrfToken, {
-    httpOnly: false, // must be readable by JS
+    httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
