@@ -119,6 +119,25 @@ router.get("/text", async (req, res) => {
   }
 });
 
+// GET /api/upload/text/:id
+router.get("/text/:id", async (req, res) => {
+  const requesterId = req.user.sub;
+  const { id } = req.params;
+
+  try {
+    const record = await db.getTextUploadById(id, requesterId);
+
+    if (record === null) {
+      return res.status(404).json({ error: "Record not found" });
+    }
+
+    res.json({ ok: true, text: record.Text_Content, uploadedAt: record.Upload_Time });
+  } catch (err) {
+    console.error("Error fetching text upload by ID:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/upload/signed-url
 router.get("/signed-url", async (req, res) => {
   const { key } = req.query;
