@@ -80,6 +80,31 @@ export async function getTextUploads(patientUid) {
     return data || [];
 }
 
+export async function getTextUploadById(textUploadId, requesterId) {
+    const { data: record, error } = await supabase
+        .from("Text_Upload")
+        .select("Text_Content, Upload_Time, Patient_UID")
+        .eq("Text_Upload_ID", textUploadId)
+        .single();
+
+    if (error) throw new Error(error.message);
+    if (!record) return null;
+
+    if (record.Patient_UID === requesterId) return record;
+
+    const { data: selection, error: selError } = await supabase
+        .from("Provider_Selection")
+        .select("Provider_Selection_ID")
+        .eq("Patient_UID", record.Patient_UID)
+        .eq("Provider_UID", requesterId)
+        .maybeSingle();
+
+    if (selError) throw new Error(selError.message);
+    if (selection) return record;
+
+    return null;
+}
+
 export async function insertTextUpload(text, patientUid) {
     const { error } = await supabase.rpc("Insert_Text_Upload", {
         p_text_content: text,

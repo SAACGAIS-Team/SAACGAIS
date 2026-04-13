@@ -1,16 +1,132 @@
 import { useState, useEffect } from "react";
 import {
   Box, Button, Typography, TextField, CircularProgress,
-  Alert, Divider, List, ListItem, ListItemText, Chip, IconButton, Tooltip
+  Alert, Divider, List, ListItem, ListItemText, Chip, IconButton, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Stack,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { uploadService } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
 import PageCard from "../components/PageCard.js";
+import PropTypes from "prop-types";
 
 const ALLOWED_EXTENSIONS = ".pdf,.txt,.md,.csv,.json,.xml,.html";
 const ALLOWED_LABEL = "PDF, TXT, MD, CSV, JSON, XML, HTML (max 10MB)";
 
+// ── Text View Dialog ──────────────────────────────────────────────────────────
+function TextViewDialog({ item, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(item.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Typography variant="h6">Text Upload</Typography>
+          <Typography variant="caption" color="text.secondary">{item.uploadedAt}</Typography>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Box sx={{
+          bgcolor: "background.default", borderRadius: 1, p: 2,
+          fontFamily: "monospace", fontSize: "0.875rem",
+          whiteSpace: "pre-wrap", wordBreak: "break-word",
+          maxHeight: "60vh", overflowY: "auto", lineHeight: 1.7,
+        }}>
+          {item.content}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="contained" startIcon={<ContentCopyIcon />} onClick={handleCopy}>
+          {copied ? "Copied!" : "Copy"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+TextViewDialog.propTypes = {
+  item: PropTypes.shape({
+    content: PropTypes.string.isRequired,
+    uploadedAt: PropTypes.string.isRequired,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
+// ── File View Dialog ──────────────────────────────────────────────────────────
+function FileViewDialog({ item, onClose, onDownload, downloading }) {
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Typography variant="h6" noWrap sx={{ maxWidth: "75%" }}>{item.fileName}</Typography>
+          <Typography variant="caption" color="text.secondary">{item.uploadedAt}</Typography>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        {item.loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+            <CircularProgress />
+          </Box>
+        ) : item.error ? (
+          <Alert severity="error">{item.error}</Alert>
+        ) : item.contentType === "pdf" ? (
+          <Box
+            component="iframe"
+            src={item.content}
+            sx={{ width: "100%", height: "65vh", border: "none" }}
+            title={item.fileName}
+          />
+        ) : (
+          <Box sx={{
+            bgcolor: "background.default", borderRadius: 1, p: 2,
+            fontFamily: "monospace", fontSize: "0.875rem",
+            whiteSpace: "pre-wrap", wordBreak: "break-word",
+            maxHeight: "65vh", overflowY: "auto", lineHeight: 1.7,
+          }}>
+            {item.content}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button
+          variant="contained"
+          startIcon={downloading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+          onClick={onDownload}
+          disabled={downloading || item.loading}
+        >
+          Download
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+FileViewDialog.propTypes = {
+  item: PropTypes.shape({
+    fileName: PropTypes.string.isRequired,
+    uploadedAt: PropTypes.string.isRequired,
+    content: PropTypes.string,
+    contentType: PropTypes.string,
+    loading: PropTypes.bool.isRequired,
+    error: PropTypes.string,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onDownload: PropTypes.func.isRequired,
+  downloading: PropTypes.bool.isRequired,
+};
+
+// ── Main Upload Page ──────────────────────────────────────────────────────────
 export default function Upload() {
   const { isAuthenticated } = useAuth();
 
@@ -26,6 +142,9 @@ export default function Upload() {
 
   const [downloadingKey, setDownloadingKey] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
+
+  const [viewTextDialog, setViewTextDialog] = useState(null);
+  const [viewFileDialog, setViewFileDialog] = useState(null);
 
   const showFileMessage = (type, text) => {
     setFileMessage({ type, text });
@@ -122,19 +241,51 @@ export default function Upload() {
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const handleViewText = (t) => {
+    setViewTextDialog({ content: t.Text_Content, uploadedAt: formatDate(t.Upload_Time) });
+  };
+
+  const handleViewFile = async (f) => {
+    setViewFileDialog({
+      fileName: f.File_Name, s3Key: f.S3_Key,
+      uploadedAt: formatDate(f.Upload_Time),
+      content: null, contentType: null, loading: true, error: null,
+    });
+    try {
+      const blob = await uploadService.downloadFile(f.S3_Key);
+      const ext = f.File_Name.split(".").pop().toLowerCase();
+      if (ext === "pdf") {
+        const url = URL.createObjectURL(blob);
+        setViewFileDialog((prev) => ({ ...prev, content: url, contentType: "pdf", loading: false }));
+      } else {
+        const textContent = await blob.text();
+        setViewFileDialog((prev) => ({ ...prev, content: textContent, contentType: "text", loading: false }));
+      }
+    } catch (err) {
+      setViewFileDialog((prev) => ({ ...prev, loading: false, error: err.message }));
+    }
+  };
+
+  const handleCloseFileDialog = () => {
+    if (viewFileDialog?.contentType === "pdf" && viewFileDialog?.content) {
+      URL.revokeObjectURL(viewFileDialog.content);
+    }
+    setViewFileDialog(null);
+  };
+
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric", month: "short", day: "numeric",
       hour: "2-digit", minute: "2-digit",
     });
-  };
 
   return (
     <PageCard>
       <Typography variant="h4" gutterBottom>Upload</Typography>
 
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {/* File Upload Section */}
+
+        {/* ── File Upload Section ─────────────────────────────────────── */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           <Typography variant="h6" gutterBottom>File Upload</Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
@@ -142,19 +293,15 @@ export default function Upload() {
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, mb: 2 }}>
             <input
-              type="file"
-              id="file-upload"
-              multiple
-              accept={ALLOWED_EXTENSIONS}
-              style={{ display: "none" }}
+              type="file" id="file-upload" multiple
+              accept={ALLOWED_EXTENSIONS} style={{ display: "none" }}
               onChange={handleFileSelect}
             />
             <label htmlFor="file-upload">
               <Button variant="outlined" component="span">Choose Files</Button>
             </label>
             <Button
-              variant="contained"
-              onClick={handleFileUpload}
+              variant="contained" onClick={handleFileUpload}
               disabled={fileLoading || selectedFiles.length === 0}
             >
               {fileLoading ? <CircularProgress size={24} color="inherit" /> : "Upload Files"}
@@ -178,9 +325,7 @@ export default function Upload() {
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>File History</Typography>
           {loadingHistory ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-              <CircularProgress size={24} />
-            </Box>
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={24} /></Box>
           ) : fileHistory.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
           ) : (
@@ -190,15 +335,24 @@ export default function Upload() {
                   key={f.File_Upload_ID}
                   disableGutters
                   secondaryAction={
-                    <Tooltip title="Download">
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleDownload(f.S3_Key, f.File_Name)}
-                        disabled={downloadingKey === f.S3_Key}
-                      >
-                        {downloadingKey === f.S3_Key ? <CircularProgress size={18} /> : <DownloadIcon />}
-                      </IconButton>
-                    </Tooltip>
+                    <Stack direction="row" spacing={0}>
+                      <Tooltip title="View">
+                        <IconButton edge="end" onClick={() => handleViewFile(f)}>
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Download">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleDownload(f.S3_Key, f.File_Name)}
+                          disabled={downloadingKey === f.S3_Key}
+                        >
+                          {downloadingKey === f.S3_Key
+                            ? <CircularProgress size={18} />
+                            : <DownloadIcon fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   }
                 >
                   <ListItemText primary={f.File_Name} secondary={formatDate(f.Upload_Time)} />
@@ -208,19 +362,13 @@ export default function Upload() {
           )}
         </Box>
 
-        {/* Text Upload Section */}
+        {/* ── Text Upload Section ─────────────────────────────────────── */}
         <Box sx={{ flex: 1, minWidth: 300 }}>
           <Typography variant="h6" gutterBottom>Text Upload</Typography>
           <TextField
-            label="Enter text"
-            multiline
-            minRows={6}
-            maxRows={12}
-            variant="outlined"
-            fullWidth
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            sx={{ mb: 2 }}
+            label="Enter text" multiline minRows={6} maxRows={12}
+            variant="outlined" fullWidth value={text}
+            onChange={(e) => setText(e.target.value)} sx={{ mb: 2 }}
           />
           {textMessage && (
             <Alert severity={textMessage.type} sx={{ mb: 2 }} onClose={() => setTextMessage(null)}>
@@ -228,10 +376,8 @@ export default function Upload() {
             </Alert>
           )}
           <Button
-            variant="contained"
-            onClick={handleTextUpload}
-            disabled={textLoading || !text.trim()}
-            sx={{ mb: 3 }}
+            variant="contained" onClick={handleTextUpload}
+            disabled={textLoading || !text.trim()} sx={{ mb: 3 }}
           >
             {textLoading ? <CircularProgress size={24} color="inherit" /> : "Save Text"}
           </Button>
@@ -239,18 +385,27 @@ export default function Upload() {
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" gutterBottom>Text History</Typography>
           {loadingHistory ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-              <CircularProgress size={24} />
-            </Box>
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={24} /></Box>
           ) : textHistory.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No text uploaded yet.</Typography>
           ) : (
             <List dense>
               {textHistory.map((t) => (
-                <ListItem key={t.Text_Upload_ID} disableGutters>
+                <ListItem
+                  key={t.Text_Upload_ID}
+                  disableGutters
+                  secondaryAction={
+                    <Tooltip title="View">
+                      <IconButton edge="end" onClick={() => handleViewText(t)}>
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }
+                >
                   <ListItemText
-                    primary={t.Text_Content.length > 80 ? t.Text_Content.slice(0, 80) + "..." : t.Text_Content}
+                    primary={t.Text_Content.length > 80 ? t.Text_Content.slice(0, 80) + "…" : t.Text_Content}
                     secondary={formatDate(t.Upload_Time)}
+                    slotProps={{ primary: { noWrap: true, sx: { maxWidth: 220 } } }}
                   />
                 </ListItem>
               ))}
@@ -258,6 +413,19 @@ export default function Upload() {
           )}
         </Box>
       </Box>
+
+      {/* ── Dialogs ─────────────────────────────────────────────────── */}
+      {viewTextDialog && (
+        <TextViewDialog item={viewTextDialog} onClose={() => setViewTextDialog(null)} />
+      )}
+      {viewFileDialog && (
+        <FileViewDialog
+          item={viewFileDialog}
+          onClose={handleCloseFileDialog}
+          onDownload={() => handleDownload(viewFileDialog.s3Key, viewFileDialog.fileName)}
+          downloading={downloadingKey === viewFileDialog.s3Key}
+        />
+      )}
     </PageCard>
   );
 }

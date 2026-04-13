@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Box, Button, Typography, TextField, CircularProgress,
-  Avatar, Chip, Autocomplete, Paper, Divider, Collapse, IconButton, Alert,
+  Avatar, Chip, Autocomplete, Paper, Divider, Collapse, IconButton, Alert, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Stack,
 } from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SendIcon from "@mui/icons-material/Send";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -15,12 +18,140 @@ import { useAuth } from "../context/AuthContext.js";
 import { aiService, providerService, uploadService } from "../api.js";
 import PageCard from "../components/PageCard.js";
 
+// ── Record View Dialog ────────────────────────────────────────────────────────
+function RecordViewDialog({ rec, onClose }) {
+  const [state, setState] = useState({ content: null, contentType: null, loading: true, error: null });
+  const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    let blobUrl = null;
+
+    const load = async () => {
+      try {
+        if (rec.type === "file") {
+          const blob = await uploadService.downloadFile(rec.id);
+          const ext = (rec.fileName || "").split(".").pop().toLowerCase();
+          if (ext === "pdf") {
+            blobUrl = URL.createObjectURL(blob);
+            setState({ content: blobUrl, contentType: "pdf", loading: false, error: null });
+          } else {
+            const text = await blob.text();
+            setState({ content: text, contentType: "text", loading: false, error: null });
+          }
+        } else {
+          const res = await uploadService.getTextById(rec.id);
+          setState({ content: res.text, contentType: "text", loading: false, error: null });
+        }
+      } catch (err) {
+        setState({ content: null, contentType: null, loading: false, error: err.message });
+      }
+    };
+
+    load();
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [rec]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(state.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const blob = await uploadService.downloadFile(rec.id);
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = rec.fileName || rec.id.split("/").pop();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download error:", err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const title = rec.fileName || (rec.type === "text" ? "Text Record" : "File Record");
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Typography variant="h6" noWrap sx={{ maxWidth: "75%" }}>{title}</Typography>
+          {rec.uploadedAt && (
+            <Typography variant="caption" color="text.secondary">
+              {new Date(rec.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </Typography>
+          )}
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        {state.loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+            <CircularProgress />
+          </Box>
+        ) : state.error ? (
+          <Alert severity="error">{state.error}</Alert>
+        ) : state.contentType === "pdf" ? (
+          <Box component="iframe" src={state.content} sx={{ width: "100%", height: "65vh", border: "none" }} title={title} />
+        ) : (
+          <Box sx={{
+            bgcolor: "background.default", borderRadius: 1, p: 2,
+            fontFamily: "monospace", fontSize: "0.875rem",
+            whiteSpace: "pre-wrap", wordBreak: "break-word",
+            maxHeight: "65vh", overflowY: "auto", lineHeight: 1.7,
+          }}>
+            {state.content}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        {rec.type === "text" ? (
+          <Button
+            variant="contained" startIcon={<ContentCopyIcon />}
+            onClick={handleCopy} disabled={state.loading || !!state.error}
+          >
+            {copied ? "Copied!" : "Copy"}
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            startIcon={downloading ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+            onClick={handleDownload} disabled={downloading || state.loading || !!state.error}
+          >
+            Download
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+RecordViewDialog.propTypes = {
+  rec: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    type: PropTypes.string.isRequired,
+    fileName: PropTypes.string,
+    uploadedAt: PropTypes.string,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+};
+
 // ── Result card for a single patient ─────────────────────────────────────────
 function PatientResultCard({ result }) {
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [citationsOpen, setCitationsOpen] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [viewingRec, setViewingRec] = useState(null);
 
   const handleDownload = async (rec) => {
     if (rec.type !== "file") return;
@@ -120,18 +251,17 @@ function PatientResultCard({ result }) {
                       )}
                     </Box>
                     <Chip label={rec.type} size="small" variant="outlined" sx={{ height: 18, fontSize: "0.65rem", flexShrink: 0 }} />
-                    {rec.type === "file" && (
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDownload(rec)}
-                        disabled={downloadingId === rec.id}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        {downloadingId === rec.id
-                          ? <CircularProgress size={14} />
-                          : <DownloadIcon sx={{ fontSize: 16 }} />
-                        }
+                    <Tooltip title="View">
+                      <IconButton size="small" onClick={() => setViewingRec(rec)}>
+                        <VisibilityIcon sx={{ fontSize: 16 }} />
                       </IconButton>
+                    </Tooltip>
+                    {rec.type === "file" && (
+                      <Tooltip title="Download">
+                        <IconButton size="small" onClick={() => handleDownload(rec)} disabled={downloadingId === rec.id} sx={{ flexShrink: 0 }}>
+                          {downloadingId === rec.id ? <CircularProgress size={14} /> : <DownloadIcon sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                      </Tooltip>
                     )}
                   </Box>
                 ))}
@@ -196,6 +326,9 @@ function PatientResultCard({ result }) {
             </Collapse>
           </Box>
         </>
+      )}
+      {viewingRec && (
+        <RecordViewDialog rec={viewingRec} onClose={() => setViewingRec(null)} />
       )}
     </Paper>
   );

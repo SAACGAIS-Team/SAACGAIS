@@ -113,6 +113,10 @@ export const uploadService = {
     return await fetchWithAuth("/upload/text");
   },
 
+  getTextById: async (id) => {
+    return await fetchWithAuth(`/upload/text/${id}`);
+  },
+
   getSignedUrl: async (s3Key) => {
     return await fetchWithAuth(`/upload/signed-url?key=${encodeURIComponent(s3Key)}`);
   },
