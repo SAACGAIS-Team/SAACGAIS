@@ -7,6 +7,7 @@ import {
 import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { uploadService } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
 import PageCard from "../components/PageCard.js";
@@ -146,6 +147,9 @@ export default function Upload() {
   const [viewTextDialog, setViewTextDialog] = useState(null);
   const [viewFileDialog, setViewFileDialog] = useState(null);
 
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
   const showFileMessage = (type, text) => {
     setFileMessage({ type, text });
     setTimeout(() => setFileMessage(null), 5000);
@@ -222,10 +226,10 @@ export default function Upload() {
     }
   };
 
-  const handleDownload = async (s3Key, fileName) => {
-    setDownloadingKey(s3Key);
+  const handleDownload = async (id, fileName) => {
+    setDownloadingKey(id);
     try {
-      const blob = await uploadService.downloadFile(s3Key);
+      const blob = await uploadService.downloadFile(id);
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
@@ -247,12 +251,13 @@ export default function Upload() {
 
   const handleViewFile = async (f) => {
     setViewFileDialog({
-      fileName: f.File_Name, s3Key: f.S3_Key,
+      fileName: f.File_Name,
+      id: f.File_Upload_ID,
       uploadedAt: formatDate(f.Upload_Time),
       content: null, contentType: null, loading: true, error: null,
     });
     try {
-      const blob = await uploadService.downloadFile(f.S3_Key);
+      const blob = await uploadService.downloadFile(f.File_Upload_ID);
       const ext = f.File_Name.split(".").pop().toLowerCase();
       if (ext === "pdf") {
         const url = URL.createObjectURL(blob);
@@ -271,6 +276,35 @@ export default function Upload() {
       URL.revokeObjectURL(viewFileDialog.content);
     }
     setViewFileDialog(null);
+  };
+
+  const handleDeleteConfirm = (type, id, label) => {
+    setConfirmDelete({ type, id, label });
+  };
+
+  const handleDeleteExecute = async () => {
+    if (!confirmDelete) return;
+    const { type, id } = confirmDelete;
+    setDeletingId(id);
+    setConfirmDelete(null);
+    try {
+      if (type === "file") {
+        await uploadService.deleteFile(id);
+        const res = await uploadService.getFileUploads();
+        setFileHistory(res.uploads || []);
+        showFileMessage("success", "File deleted successfully");
+      } else {
+        await uploadService.deleteText(id);
+        const res = await uploadService.getTextUploads();
+        setTextHistory(res.uploads || []);
+        showTextMessage("success", "Text deleted successfully");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message;
+      type === "file" ? showFileMessage("error", msg) : showTextMessage("error", msg);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const formatDate = (dateString) =>
@@ -344,12 +378,24 @@ export default function Upload() {
                       <Tooltip title="Download">
                         <IconButton
                           edge="end"
-                          onClick={() => handleDownload(f.S3_Key, f.File_Name)}
-                          disabled={downloadingKey === f.S3_Key}
+                          onClick={() => handleDownload(f.File_Upload_ID, f.File_Name)}
+                          disabled={downloadingKey === f.File_Upload_ID}
                         >
-                          {downloadingKey === f.S3_Key
+                          {downloadingKey === f.File_Upload_ID
                             ? <CircularProgress size={18} />
                             : <DownloadIcon fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          edge="end"
+                          color="error"
+                          onClick={() => handleDeleteConfirm("file", f.File_Upload_ID, f.File_Name)}
+                          disabled={deletingId === f.File_Upload_ID}
+                        >
+                          {deletingId === f.File_Upload_ID
+                            ? <CircularProgress size={18} />
+                            : <DeleteIcon fontSize="small" />}
                         </IconButton>
                       </Tooltip>
                     </Stack>
@@ -395,11 +441,29 @@ export default function Upload() {
                   key={t.Text_Upload_ID}
                   disableGutters
                   secondaryAction={
-                    <Tooltip title="View">
-                      <IconButton edge="end" onClick={() => handleViewText(t)}>
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    <Stack direction="row" spacing={0}>
+                      <Tooltip title="View">
+                        <IconButton edge="end" onClick={() => handleViewText(t)}>
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          edge="end"
+                          color="error"
+                          onClick={() => handleDeleteConfirm(
+                            "text",
+                            t.Text_Upload_ID,
+                            t.Text_Content.slice(0, 40) + (t.Text_Content.length > 40 ? "…" : "")
+                          )}
+                          disabled={deletingId === t.Text_Upload_ID}
+                        >
+                          {deletingId === t.Text_Upload_ID
+                            ? <CircularProgress size={18} />
+                            : <DeleteIcon fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   }
                 >
                   <ListItemText
@@ -422,9 +486,26 @@ export default function Upload() {
         <FileViewDialog
           item={viewFileDialog}
           onClose={handleCloseFileDialog}
-          onDownload={() => handleDownload(viewFileDialog.s3Key, viewFileDialog.fileName)}
-          downloading={downloadingKey === viewFileDialog.s3Key}
+          onDownload={() => handleDownload(viewFileDialog.id, viewFileDialog.fileName)}
+          downloading={downloadingKey === viewFileDialog.id}
         />
+      )}
+      {confirmDelete && (
+        <Dialog open onClose={() => setConfirmDelete(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to permanently delete{" "}
+              <strong>{confirmDelete.label}</strong>? This cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
+            <Button variant="contained" color="error" onClick={handleDeleteExecute}>
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </PageCard>
   );

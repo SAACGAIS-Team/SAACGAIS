@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import * as db from "../services/supabaseService.js";
@@ -138,42 +138,61 @@ router.get("/text/:id", async (req, res) => {
   }
 });
 
-// GET /api/upload/signed-url
-router.get("/signed-url", async (req, res) => {
-  const { key } = req.query;
-  if (!key) return res.status(400).json({ error: "key is required" });
+// GET /api/upload/download/:id
+router.get("/download/:id", async (req, res) => {
+  const requesterId = req.user.sub;
+  const { id } = req.params;
 
   try {
+    const record = await db.getFileUploadById(id, requesterId);
+    if (!record) return res.status(403).json({ error: "Not found or access denied" });
+
     const command = new GetObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME,
-      Key: key,
-    });
-    const url = await getSignedUrl(s3, command, { expiresIn: 300 });
-    res.json({ ok: true, url });
-  } catch (err) {
-    console.error("Error generating signed URL:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/upload/download
-router.get("/download", async (req, res) => {
-  const { key } = req.query;
-  if (!key) return res.status(400).json({ error: "key is required" });
-
-  const fileName = key.split("/").pop();
-
-  try {
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
-      Key: key,
+      Key: record.S3_Key,
     });
     const s3Response = await s3.send(command);
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${record.File_Name}"`);
     res.setHeader("Content-Type", s3Response.ContentType || "application/octet-stream");
     s3Response.Body.pipe(res);
   } catch (err) {
     console.error("Download error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/upload/file/:id
+router.delete("/file/:id", async (req, res) => {
+  const patientId = req.user.sub;
+  const { id } = req.params;
+
+  try {
+    const record = await db.getFileUploadByIdOwnerOnly(id, patientId);
+    if (!record) return res.status(404).json({ error: "File not found" });
+
+    await s3.send(new DeleteObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Key: record.S3_Key,
+    }));
+
+    await db.deleteFileUpload(id, patientId);
+    res.json({ ok: true, message: "File deleted successfully" });
+  } catch (err) {
+    console.error("File delete error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/upload/text/:id
+router.delete("/text/:id", async (req, res) => {
+  const patientId = req.user.sub;
+  const { id } = req.params;
+
+  try {
+    await db.deleteTextUpload(id, patientId);
+    res.json({ ok: true, message: "Text deleted successfully" });
+  } catch (err) {
+    console.error("Text delete error:", err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -11,6 +11,9 @@ jest.mock("../api.js", () => ({
     getTextUploads: jest.fn(),
     uploadFiles: jest.fn(),
     uploadText: jest.fn(),
+    downloadFile: jest.fn(),
+    deleteFile: jest.fn(),
+    deleteText: jest.fn(),
   },
 }));
 
@@ -40,20 +43,20 @@ describe("Upload component", () => {
 
   test("uploads files and displays success message", async () => {
     uploadService.uploadFiles.mockResolvedValueOnce({ ok: true });
-    
+
     await act(async () => {
       render(<Upload />);
     });
 
     const file = new File(["dummy"], "test.txt", { type: "text/plain" });
     const fileInput = document.getElementById("file-upload");
-    
+
     await act(async () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
     });
 
     const uploadButton = screen.getByRole("button", { name: /Upload Files/i });
-    
+
     await act(async () => {
       fireEvent.click(uploadButton);
     });

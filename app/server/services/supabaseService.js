@@ -68,6 +68,56 @@ export async function insertFileUpload(fileName, s3Key, patientUid) {
     if (error) throw new Error(error.message);
 }
 
+// Owner-or-provider read — mirrors getTextUploadById for any route that looks up
+// a file record by ID and needs to authorize both the owning patient and their provider
+export async function getFileUploadById(fileUploadId, requesterId) {
+    const { data: record, error } = await supabase
+        .from("File_Upload")
+        .select("File_Upload_ID, S3_Key, File_Name, Patient_UID")
+        .eq("File_Upload_ID", fileUploadId)
+        .single();
+
+    if (error) throw new Error(error.message);
+    if (!record) return null;
+
+    if (record.Patient_UID === requesterId) return record;
+
+    const { data: selection, error: selError } = await supabase
+        .from("Provider_Selection")
+        .select("Provider_Selection_ID")
+        .eq("Patient_UID", record.Patient_UID)
+        .eq("Provider_UID", requesterId)
+        .maybeSingle();
+
+    if (selError) throw new Error(selError.message);
+    if (selection) return record;
+
+    return null;
+}
+
+// Owner-only read — used exclusively by the DELETE route, which needs the S3_Key
+// to remove the object from S3, and must restrict deletion to the patient only
+export async function getFileUploadByIdOwnerOnly(fileUploadId, patientUid) {
+    const { data, error } = await supabase
+        .from("File_Upload")
+        .select("File_Upload_ID, S3_Key, File_Name, Patient_UID")
+        .eq("File_Upload_ID", fileUploadId)
+        .eq("Patient_UID", patientUid)
+        .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+}
+
+export async function deleteFileUpload(fileUploadId, patientUid) {
+    const { error } = await supabase
+        .from("File_Upload")
+        .delete()
+        .eq("File_Upload_ID", fileUploadId)
+        .eq("Patient_UID", patientUid);
+    if (error) throw new Error(error.message);
+}
+
 // ============================================
 // Text Uploads
 // ============================================
@@ -110,5 +160,14 @@ export async function insertTextUpload(text, patientUid) {
         p_text_content: text,
         p_patient_uid: patientUid,
     });
+    if (error) throw new Error(error.message);
+}
+
+export async function deleteTextUpload(textUploadId, patientUid) {
+    const { error } = await supabase
+        .from("Text_Upload")
+        .delete()
+        .eq("Text_Upload_ID", textUploadId)
+        .eq("Patient_UID", patientUid);
     if (error) throw new Error(error.message);
 }
