@@ -105,6 +105,14 @@ export const uploadService = {
     });
   },
 
+  deleteFile: async (id) => {
+    return await fetchWithAuth(`/upload/file/${id}`, { method: "DELETE" });
+  },
+
+  deleteText: async (id) => {
+    return await fetchWithAuth(`/upload/text/${id}`, { method: "DELETE" });
+  },
+
   getFileUploads: async () => {
     return await fetchWithAuth("/upload/file");
   },
@@ -117,18 +125,19 @@ export const uploadService = {
     return await fetchWithAuth(`/upload/text/${id}`);
   },
 
-  getSignedUrl: async (s3Key) => {
-    return await fetchWithAuth(`/upload/signed-url?key=${encodeURIComponent(s3Key)}`);
-  },
-
-  downloadFile: async (s3Key) => {
-    const url = `${apiConfig.baseUrlAPI}/upload/download?key=${encodeURIComponent(s3Key)}`;
+  downloadFile: async (id) => {
+    const url = `${apiConfig.baseUrlAPI}/upload/download/${id}`;
     const token = getCsrfToken();
     const response = await fetch(url, {
       credentials: "include",
       headers: token ? { "X-CSRF-Token": token } : {},
     });
-    if (!response.ok) throw new Error("Download failed");
+    if (!response.ok) {
+      const data = await response.json();
+      const error = new Error(data.error || "Download failed");
+      error.response = { status: response.status, data };
+      throw error;
+    }
     return response.blob();
   },
 };

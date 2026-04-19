@@ -132,7 +132,7 @@ async function fetchPatientRecords(patientUid) {
         const buffer = await s3FileToBuffer(file.S3_Key);
         const content = await extractTextFromFile(buffer, file.File_Name);
         return {
-          id: file.S3_Key,
+          id: file.File_Upload_ID,
           type: "file",
           fileName: file.File_Name,
           content,
