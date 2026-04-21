@@ -11,6 +11,7 @@ import ProviderChat from "./pages/ProviderChat.js";
 import AccountSettings from "./pages/AccountSettings.js";
 import Login from "./pages/Login.js";
 import Signup from "./pages/Signup.js";
+import Team from "./pages/Team.js";
 
 function ProtectedRoute({ children, allowedGroups = [] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -94,10 +95,11 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+        <Route path="/team" element={<Team />} />
         <Route path="/about" element={<About />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
+        
       </Routes>
     </Router>
   );
