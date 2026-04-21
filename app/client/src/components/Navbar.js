@@ -93,7 +93,13 @@ export default function Navbar() {
 
           {(userGroups.includes("Healthcare-Provider")) && (
             <Button color="inherit" component={Link} to="/provider-chat" sx={{ color: "white", fontSize: "12px" }}>
-              Provider Chat
+              AI: My Patients
+            </Button>
+          )}
+
+          {userGroups.includes("Patient") && (
+            <Button color="inherit" component={Link} to="/patient-chat" sx={{ color: "white", fontSize: "12px" }}>
+              AI: My Records
             </Button>
           )}
 
