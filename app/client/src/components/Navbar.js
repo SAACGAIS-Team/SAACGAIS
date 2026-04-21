@@ -102,9 +102,14 @@ export default function Navbar() {
               Select Provider
             </Button>
           )}
+          
 
           <Button color="inherit" component={Link} to="/about" sx={{ color: "white", fontSize: "12px" }}>
             About
+          </Button>
+
+          <Button color="inherit" component={Link} to="/Team" sx={{ color: "white", fontSize: "12px" }}>
+            Team
           </Button>
 
           {/* Authenticated: avatar dropdown */}
