@@ -84,6 +84,12 @@ export const aiService = {
       body: JSON.stringify({ query, patientIds }),
     });
   },
+  querySelf: async (query) => {
+    return await fetchWithAuth(`${apiConfig.endpoints.ai}/patient-self-query`, {
+      method: "POST",
+      body: JSON.stringify({ query }),
+    });
+  },
 };
 
 // ============================================

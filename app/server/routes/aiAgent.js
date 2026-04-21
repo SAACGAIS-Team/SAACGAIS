@@ -132,7 +132,7 @@ async function fetchPatientRecords(patientUid) {
         const buffer = await s3FileToBuffer(file.S3_Key);
         const content = await extractTextFromFile(buffer, file.File_Name);
         return {
-          id: file.File_Upload_ID,
+          id: String(file.File_Upload_ID),
           type: "file",
           fileName: file.File_Name,
           content,
@@ -228,15 +228,15 @@ router.post("/query", async (req, res) => {
 
         const { summary, citedRecordIDs = [] } = summaryResult;
 
-        const validRecordIds = new Set(records.map((r) => r.id));
+        const validRecordIds = new Set(records.map((r) => String(r.id)));
         const safeCitedRecordIDs = Array.isArray(citedRecordIDs)
-          ? citedRecordIDs.filter((id) => typeof id === "string" && validRecordIds.has(id))
+          ? citedRecordIDs.map(String).filter((id) => validRecordIds.has(id))
           : [];
 
         const citedRecords = records
-          .filter((r) => safeCitedRecordIDs.includes(r.id))
+          .filter((r) => safeCitedRecordIDs.includes(String(r.id)))
           .map((r) => ({
-            id: r.id,
+            id: String(r.id),
             type: r.type,
             fileName: r.fileName,
             uploadedAt: r.uploadedAt,
@@ -274,6 +274,112 @@ router.post("/query", async (req, res) => {
     res.json({ ok: true, results });
   } catch (err) {
     console.error("Error in AI query:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// POST /api/ai/patient-self-query
+// Body: { query: string }
+// Patients query their own records only.
+// ============================================
+router.post("/patient-self-query", async (req, res) => {
+  const patientUid = req.user.sub;
+  const userRoles = req.user.roles || [];
+  const { query } = req.body;
+
+  if (!userRoles.includes("Patient")) {
+    return res.status(403).json({ error: "Only patients can use this endpoint" });
+  }
+
+  if (!query?.trim()) {
+    return res.status(400).json({ error: "query is required" });
+  }
+
+  try {
+    let records;
+    try {
+      records = await fetchPatientRecords(patientUid);
+    } catch (err) {
+      console.error(`Failed to fetch records for ${patientUid}:`, err.message);
+      return res.status(500).json({ error: "Failed to fetch your records" });
+    }
+
+    // ── Agent 1: Clinical Summary ──────────────────────────
+    let summaryResult;
+    try {
+      const { parsed, rawMessage } = await invokeAgent(
+        process.env.AWS_AGENT1_ID,
+        process.env.AWS_AGENT1_ALIAS_ID,
+        `summary-${patientUid}-${Date.now()}`,
+        JSON.stringify({
+          query,
+          records: records.map((r) => ({ id: r.id, content: r.content })),
+        })
+      );
+
+      if (!parsed || !validateSummaryResult(parsed)) {
+        return res.json({
+          ok: true,
+          result: {
+            patientUid,
+            error: rawMessage || "No relevant records found for this query.",
+          },
+        });
+      }
+
+      summaryResult = parsed;
+    } catch (err) {
+      console.error(`Agent 1 failed for ${patientUid}:`, err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    const { summary, citedRecordIDs = [] } = summaryResult;
+
+    const validRecordIds = new Set(records.map((r) => String(r.id)));
+    const safeCitedRecordIDs = Array.isArray(citedRecordIDs)
+      ? citedRecordIDs.map(String).filter((id) => validRecordIds.has(id))
+      : [];
+
+    const citedRecords = records
+      .filter((r) => safeCitedRecordIDs.includes(String(r.id)))
+      .map((r) => ({
+        id: String(r.id),
+        type: r.type,
+        fileName: r.fileName,
+        uploadedAt: r.uploadedAt,
+      }));
+
+    // ── Agent 2: Healthcare Suggestions ───────────────────
+    let suggestionsResult;
+    try {
+      const { parsed } = await invokeAgent(
+        process.env.AWS_AGENT2_ID,
+        process.env.AWS_AGENT2_ALIAS_ID,
+        `suggestions-${patientUid}-${Date.now()}`,
+        JSON.stringify({
+          summary,
+          patientAge: null,
+          knownConditions: [],
+        })
+      );
+      suggestionsResult = parsed || { suggestions: [] };
+    } catch (err) {
+      console.error(`Agent 2 failed for ${patientUid}:`, err.message);
+      suggestionsResult = { suggestions: [] };
+    }
+
+    res.json({
+      ok: true,
+      result: {
+        patientUid,
+        summary,
+        citedRecords,
+        suggestions: suggestionsResult.suggestions || [],
+      },
+    });
+  } catch (err) {
+    console.error("Error in patient self-query:", err);
     res.status(500).json({ error: err.message });
   }
 });

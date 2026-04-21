@@ -8,6 +8,7 @@ import SelectProvider from "./pages/SelectProvider.js";
 import ChangeRole from "./pages/ChangeRole.js";
 import About from "./pages/About.js";
 import ProviderChat from "./pages/ProviderChat.js";
+import PatientChat from "./pages/PatientChat.js";
 import AccountSettings from "./pages/AccountSettings.js";
 import Login from "./pages/Login.js";
 import Signup from "./pages/Signup.js";
@@ -64,6 +65,15 @@ function App() {
           element={
             <ProtectedRoute allowedGroups={["Healthcare-Provider"]}>
               <ProviderChat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/patient-chat"
+          element={
+            <ProtectedRoute allowedGroups={["Patient"]}>
+              <PatientChat />
             </ProtectedRoute>
           }
         />
