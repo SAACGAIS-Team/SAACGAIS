@@ -20,17 +20,20 @@
     "@aws-sdk/s3-request-presigner": "^3.1003.0",
     "@supabase/supabase-js": "^2.90.1",
     "aws-jwt-verify": "^5.1.1",
-    "aws-sdk": "^2.1693.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.4.1",
+    "express-validator": "^7.3.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.4.5",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.6",
     "pdfjs-dist": "^5.5.207",
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.0",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",

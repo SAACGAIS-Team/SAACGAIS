@@ -31,7 +31,10 @@ async function fetchWithAuth(endpoint, options = {}) {
   let data = contentType?.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const error = new Error(data.error || data.message || "Request failed");
+    const message = typeof data === "object"
+      ? (data.error || data.message || "Request failed")
+      : "Request failed";
+    const error = new Error(message);
     error.response = { status: response.status, data };
     throw error;
   }
