@@ -9,9 +9,11 @@ import ChangeRole from "./pages/ChangeRole.js";
 import About from "./pages/About.js";
 import ProviderChat from "./pages/ProviderChat.js";
 import PatientChat from "./pages/PatientChat.js";
+import Contact from "./pages/Contact.js";
 import AccountSettings from "./pages/AccountSettings.js";
 import Login from "./pages/Login.js";
 import Signup from "./pages/Signup.js";
+import ErrorBoundary from "./components/ErrorBoundary.js";
 
 function ProtectedRoute({ children, allowedGroups = [] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -42,74 +44,78 @@ ProtectedRoute.propTypes = {
 
 function App() {
   return (
-    <Router>
-      <Navbar />
+    <ErrorBoundary>
+      <Router>
+        <Navbar />
 
-      <Routes>
-        <Route path="/" element={<Home />} />
+        <Routes>
+          <Route path="/" element={<Home />} />
 
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
-        <Route
-          path="/upload"
-          element={
-            <ProtectedRoute allowedGroups={["Patient"]}>
-              <Upload />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute allowedGroups={["Patient"]}>
+                <Upload />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/provider-chat"
-          element={
-            <ProtectedRoute allowedGroups={["Healthcare-Provider"]}>
-              <ProviderChat />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/provider-chat"
+            element={
+              <ProtectedRoute allowedGroups={["Healthcare-Provider"]}>
+                <ProviderChat />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/patient-chat"
-          element={
-            <ProtectedRoute allowedGroups={["Patient"]}>
-              <PatientChat />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/patient-chat"
+            element={
+              <ProtectedRoute allowedGroups={["Patient"]}>
+                <PatientChat />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/select-provider"
-          element={
-            <ProtectedRoute allowedGroups={["Patient"]}>
-              <SelectProvider />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/select-provider"
+            element={
+              <ProtectedRoute allowedGroups={["Patient"]}>
+                <SelectProvider />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/change-role"
-          element={
-            <ProtectedRoute allowedGroups={["Administrator"]}>
-              <ChangeRole />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/change-role"
+            element={
+              <ProtectedRoute allowedGroups={["Administrator"]}>
+                <ChangeRole />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/account-settings"
-          element={
-            <ProtectedRoute>
-              <AccountSettings />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/account-settings"
+            element={
+              <ProtectedRoute>
+                <AccountSettings />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route path="/about" element={<About />} />
+          <Route path="/about" element={<About />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          <Route path="/contact" element={<Contact />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

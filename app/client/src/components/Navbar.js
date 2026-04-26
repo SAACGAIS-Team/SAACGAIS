@@ -113,6 +113,10 @@ export default function Navbar() {
             About
           </Button>
 
+          <Button color="inherit" component={Link} to="/contact" sx={{ color: "white", fontSize: "12px" }}>
+            Contact
+          </Button>
+
           {/* Authenticated: avatar dropdown */}
           {isAuthenticated ? (
             <Box ref={menuRef} sx={{ position: "relative", ml: 1 }}>

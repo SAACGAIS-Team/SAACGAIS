@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
   client:
@@ -30,6 +30,10 @@ jobs:
       - name: Install dependencies
         working-directory: app/client
         run: npm ci
+
+      - name: Audit dependencies
+        working-directory: app/client
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Lint
         working-directory: app/client
@@ -65,6 +69,10 @@ jobs:
         working-directory: app/server
         run: npm ci
 
+      - name: Audit dependencies
+        working-directory: app/server
+        run: npm audit --audit-level=high
+
       - name: Lint
         working-directory: app/server
         run: npm run lint
@@ -72,3 +80,47 @@ jobs:
       - name: Unit Tests (mocked DB)
         working-directory: app/server
         run: npm test -- --ci --detectOpenHandles
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: [ client, server ]
+    if: failure()
+
+    steps:
+      - name: Notify Discord
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🚨 CI Failed",
+                "color": 15158332,
+                "fields": [
+                  { "name": "Repository", "value": "${{ github.repository }}", "inline": true },
+                  { "name": "Branch", "value": "${{ github.ref_name }}", "inline": true },
+                  { "name": "Triggered by", "value": "${{ github.actor }}", "inline": true },
+                  { "name": "Run", "value": "[View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false }
+                ]
+              }]
+            }'
+
+      - name: Notify via Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SUPPORT_EMAIL }}
+          password: ${{ secrets.SUPPORT_EMAIL_PASSWORD }}
+          subject: "🚨 CI Failed — ${{ github.repository }} (${{ github.ref_name }})"
+          to: ${{ secrets.SUPPORT_EMAIL }}
+          from: "SAACGAIS CI <${{ secrets.SUPPORT_EMAIL }}>"
+          body: |
+            A CI run has failed.
+
+            Repository: ${{ github.repository }}
+            Branch:     ${{ github.ref_name }}
+            Commit:     ${{ github.sha }}
+            Triggered by: ${{ github.actor }}
+
+            View the logs:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

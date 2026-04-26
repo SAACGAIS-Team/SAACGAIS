@@ -1,5 +1,6 @@
 import supabase from "../db.js";
 import * as cognito from "./cognitoService.js";
+import logger from "../services/logger.js";
 
 // ============================================
 // Provider Selection
@@ -40,7 +41,7 @@ export async function getProviderPatients(providerUid) {
             try {
                 return await cognito.getUserById(row.Patient_UID);
             } catch (err) {
-                console.error(`Failed to fetch Cognito data for ${row.Patient_UID}:`, err.message);
+                logger.error(`Failed to fetch Cognito data for ${row.Patient_UID}:`, err.message);
                 return { patient_uid: row.Patient_UID };
             }
         })
