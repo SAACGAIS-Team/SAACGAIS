@@ -2,6 +2,7 @@ import { Component } from "react";
 import PropTypes from "prop-types";
 import { Box, Typography, Button } from "@mui/material";
 
+// Error display to user
 export default class ErrorBoundary extends Component {
   state = { hasError: false };
 
