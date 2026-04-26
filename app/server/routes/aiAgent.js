@@ -282,21 +282,85 @@ router.post("/query", async (req, res) => {
 // POST /api/ai/patient-self-query
 // Body: { query: string }
 // Patients query their own records only.
+// Agent 3 decides whether record lookup is needed.
 // ============================================
 router.post("/patient-self-query", async (req, res) => {
   const patientUid = req.user.sub;
   const userRoles = req.user.roles || [];
-  const { query } = req.body;
+  const { query, conversationHistory = [] } = req.body;
 
   if (!userRoles.includes("Patient")) {
     return res.status(403).json({ error: "Only patients can use this endpoint" });
   }
-
   if (!query?.trim()) {
     return res.status(400).json({ error: "query is required" });
   }
 
+  // ── Emergency pre-check ───────────────────────────────────────────────────
+  const EMERGENCY_KEYWORDS = [
+    "chest pain", "can't breathe", "cannot breathe", "heart attack",
+    "stroke", "unconscious", "overdose", "suicidal", "kill myself",
+    "severe bleeding", "seizure", "anaphylaxis", "allergic reaction",
+  ];
+  if (EMERGENCY_KEYWORDS.some((kw) => query.toLowerCase().includes(kw))) {
+    return res.json({
+      ok: true,
+      result: {
+        patientUid,
+        emergency: true,
+        emergencyMessage:
+          "This sounds like it could be a medical emergency. Please call 911 immediately " +
+          "or have someone take you to the nearest emergency room. Do not drive yourself. " +
+          "I am an AI assistant and cannot provide emergency medical care.",
+      },
+    });
+  }
+
   try {
+    // ── Phase 1: Agent 3 — intent detection + general health response ─────────
+    let phase1Response = null;
+    let phase1RawMessage = null;
+    try {
+      const { parsed, rawMessage } = await invokeAgent(
+        process.env.AWS_AGENT3_ID,
+        process.env.AWS_AGENT3_ALIAS_ID,
+        `patient-intent-${patientUid}-${Date.now()}`,
+        JSON.stringify({
+          patientMessage: query,
+          sessionContext: {
+            conversationHistory,
+          },
+        })
+      );
+      phase1Response = parsed;
+      phase1RawMessage = rawMessage;
+    } catch (err) {
+      console.error("Agent 3 phase 1 failed:", err.message);
+    }
+
+    // Agent 3 returned plain text instead of JSON (off-topic, clarification, etc.)
+    if (!phase1Response && phase1RawMessage) {
+      return res.json({
+        ok: true,
+        result: {
+          patientUid,
+          agentMessage: phase1RawMessage,
+        },
+      });
+    }
+
+    // General question only — return Agent 3 response, skip record pipeline
+    if (!phase1Response?.requiresRecordLookup) {
+      return res.json({
+        ok: true,
+        result: {
+          patientUid,
+          patientResponse: phase1Response,
+        },
+      });
+    }
+
+    // ── Phase 2: Record pipeline — Agents 1 and 2 ─────────────────────────────
     let records;
     try {
       records = await fetchPatientRecords(patientUid);
@@ -305,7 +369,6 @@ router.post("/patient-self-query", async (req, res) => {
       return res.status(500).json({ error: "Failed to fetch your records" });
     }
 
-    // ── Agent 1: Clinical Summary ──────────────────────────
     let summaryResult;
     try {
       const { parsed, rawMessage } = await invokeAgent(
@@ -317,7 +380,6 @@ router.post("/patient-self-query", async (req, res) => {
           records: records.map((r) => ({ id: r.id, content: r.content })),
         })
       );
-
       if (!parsed || !validateSummaryResult(parsed)) {
         return res.json({
           ok: true,
@@ -327,7 +389,6 @@ router.post("/patient-self-query", async (req, res) => {
           },
         });
       }
-
       summaryResult = parsed;
     } catch (err) {
       console.error(`Agent 1 failed for ${patientUid}:`, err.message);
@@ -340,7 +401,6 @@ router.post("/patient-self-query", async (req, res) => {
     const safeCitedRecordIDs = Array.isArray(citedRecordIDs)
       ? citedRecordIDs.map(String).filter((id) => validRecordIds.has(id))
       : [];
-
     const citedRecords = records
       .filter((r) => safeCitedRecordIDs.includes(String(r.id)))
       .map((r) => ({
@@ -350,18 +410,13 @@ router.post("/patient-self-query", async (req, res) => {
         uploadedAt: r.uploadedAt,
       }));
 
-    // ── Agent 2: Healthcare Suggestions ───────────────────
     let suggestionsResult;
     try {
       const { parsed } = await invokeAgent(
         process.env.AWS_AGENT2_ID,
         process.env.AWS_AGENT2_ALIAS_ID,
         `suggestions-${patientUid}-${Date.now()}`,
-        JSON.stringify({
-          summary,
-          patientAge: null,
-          knownConditions: [],
-        })
+        JSON.stringify({ summary, patientAge: null, knownConditions: [] })
       );
       suggestionsResult = parsed || { suggestions: [] };
     } catch (err) {
@@ -369,10 +424,18 @@ router.post("/patient-self-query", async (req, res) => {
       suggestionsResult = { suggestions: [] };
     }
 
+    // Only surface Agent 3's phase 1 response if it contains substantive
+    // clinical content — not just acknowledgement or record-retrieval placeholder text.
+    const hasGeneralContent =
+      phase1Response?.response?.SymptomAssessment ||
+      phase1Response?.response?.PossibleCauses ||
+      phase1Response?.response?.SelfCareGuidance;
+
     res.json({
       ok: true,
       result: {
         patientUid,
+        patientResponse: hasGeneralContent ? phase1Response : null,
         summary,
         citedRecords,
         suggestions: suggestionsResult.suggestions || [],
