@@ -8,7 +8,7 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
-import { apiConfig } from "../apiConfig";
+import { apiConfig } from "../apiConfig.js";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -52,13 +52,13 @@ export default function Contact() {
           Contact Us
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Have a question or need support? Send us a message and we'll get back
+          Have a question or need support? Send us a message and we&apos;ll get back
           to you as soon as possible.
         </Typography>
 
         {status === "success" && (
           <Alert severity="success">
-            Your message has been sent. We'll be in touch soon.
+            Your message has been sent. We&apos;ll be in touch soon.
           </Alert>
         )}
         {status === "error" && (

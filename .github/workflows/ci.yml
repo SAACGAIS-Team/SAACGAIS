@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, development ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, development ]
 
 jobs:
   client:
@@ -17,10 +17,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'
 
       - name: Cache Node modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: app/client/node_modules
           key: ${{ runner.os }}-client-node-${{ hashFiles('app/client/package-lock.json') }}
@@ -63,7 +63,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'
 
       - name: Install dependencies
         working-directory: app/server
@@ -106,9 +106,12 @@ jobs:
 
       - name: Notify via Email
         uses: dawidd6/action-send-mail@v3
+        env:
+          SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
         with:
           server_address: smtp.gmail.com
           server_port: 587
+          secure: false
           username: ${{ secrets.SUPPORT_EMAIL }}
           password: ${{ secrets.SUPPORT_EMAIL_PASSWORD }}
           subject: "🚨 CI Failed — ${{ github.repository }} (${{ github.ref_name }})"
