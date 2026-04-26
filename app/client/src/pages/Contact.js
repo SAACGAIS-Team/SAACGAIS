@@ -8,7 +8,7 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
-import { apiConfig } from "../apiConfig";
+import { apiConfig } from "../apiConfig.js";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
