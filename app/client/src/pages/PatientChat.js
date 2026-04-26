@@ -148,6 +148,14 @@ function SelfResultCard({ result }) {
   const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
   const [viewingRec, setViewingRec] = useState(null);
+  const [responseOpen, setResponseOpen] = useState(true);
+
+  const TRIAGE_LABELS = {
+    "TIER 1": "Emergency",
+    "TIER 2": "Urgent",
+    "TIER 3": "Semi-Urgent",
+    "TIER 4": "Non-Urgent",
+  };
 
   const handleDownload = async (rec) => {
     if (rec.type !== "file") return;
@@ -173,38 +181,191 @@ function SelfResultCard({ result }) {
     return <Alert severity="error" sx={{ mb: 1 }}>{result.error}</Alert>;
   }
 
+  const hasContent =
+    result.emergency ||
+    result.patientResponse ||
+    result.summary ||
+    result.citedRecords?.length > 0 ||
+    result.suggestions?.length > 0;
+
+  if (!hasContent) {
+    return (
+      <Alert severity="info" sx={{ mb: 1 }}>
+        No response could be generated. Please try rephrasing your question.
+      </Alert>
+    );
+  }
+
   return (
     <Paper variant="outlined" sx={{ mb: 2, borderRadius: 2, overflow: "hidden", borderColor: "divider" }}>
 
-      {/* Summary */}
-      <Box sx={{ px: 2.5, py: 1 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", py: 0.5 }} onClick={() => setSummaryOpen((o) => !o)}>
-          <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: 0.8 }}>
-            Clinical Summary
-          </Typography>
-          <IconButton size="small">{summaryOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
-        </Box>
-        <Collapse in={summaryOpen}>
-          {typeof result.summary === "object" && result.summary !== null ? (
-            <Box sx={{ pb: 1.5 }}>
-              {Object.entries(result.summary).map(([key, value]) => (
-                <Box key={key} sx={{ mb: 1 }}>
-                  <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: 0.8 }}>
-                    {key}
+      {result.emergency && (
+        <Alert severity="error" icon={false} sx={{ m: 2, borderRadius: 1.5 }}>
+          <Typography variant="body2" fontWeight={700} gutterBottom>⚠️ Emergency</Typography>
+          <Typography variant="body2">{result.emergencyMessage}</Typography>
+        </Alert>
+      )}
+
+      {result.patientResponse && (
+        <Box sx={{ px: 2.5, py: 1, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: "8px 8px 0 0" }}>
+          <Box
+            sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", py: 0.5 }}
+            onClick={() => setResponseOpen((o) => !o)}
+          >
+            <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.75rem", letterSpacing: 0.6, textTransform: "uppercase" }}>
+              AI Response
+            </Typography>
+            <IconButton size="small" sx={{ color: "primary.contrastText" }}>
+              {responseOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </IconButton>
+          </Box>
+          <Collapse in={responseOpen}>
+            <Box sx={{ pb: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+
+              {/* Triage chip */}
+              {result.patientResponse.triageTier && (
+                <Chip
+                  size="small"
+                  label={TRIAGE_LABELS[result.patientResponse.triageTier] ?? result.patientResponse.triageTier}
+                  sx={{
+                    alignSelf: "flex-start",
+                    fontWeight: 700,
+                    fontSize: "0.65rem",
+                    color: "white",
+                    bgcolor:
+                      result.patientResponse.triageTier === "TIER 1" ? "error.main" :
+                        result.patientResponse.triageTier === "TIER 2" ? "warning.main" :
+                          result.patientResponse.triageTier === "TIER 3" ? "info.main" :
+                            "success.main",
+                  }}
+                />
+              )}
+
+              {/* Emergency fallback */}
+              {result.patientResponse.response?.EmergencyMessage && (
+                <Alert severity="error" sx={{ mt: 0.5 }}>
+                  {result.patientResponse.response.EmergencyMessage}
+                </Alert>
+              )}
+
+              {/* Acknowledgement */}
+              {result.patientResponse.response?.Acknowledgement && (
+                <Typography variant="body2" sx={{ lineHeight: 1.7, color: "primary.contrastText" }}>
+                  {result.patientResponse.response.Acknowledgement}
+                </Typography>
+              )}
+
+              {/* Symptom Assessment */}
+              {result.patientResponse.response?.SymptomAssessment && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Assessment
                   </Typography>
-                  <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {Array.isArray(value) ? value.join(", ") : String(value || "Not mentioned")}
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.SymptomAssessment}
                   </Typography>
                 </Box>
-              ))}
+              )}
+
+              {/* Possible Causes */}
+              {result.patientResponse.response?.PossibleCauses && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Possible Causes
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.PossibleCauses}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Recommended Action */}
+              {result.patientResponse.response?.RecommendedAction && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Recommended Action
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.RecommendedAction}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Self Care */}
+              {result.patientResponse.response?.SelfCareGuidance && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Self-Care
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.SelfCareGuidance}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* When to Escalate */}
+              {result.patientResponse.response?.WhenToEscalate && (
+                <Alert
+                  severity={result.patientResponse.escalationRequired ? "error" : "warning"}
+                  sx={{ py: 0.5, bgcolor: "transparent", border: "1px solid", borderColor: result.patientResponse.escalationRequired ? "error.light" : "warning.light" }}
+                >
+                  <Typography variant="caption" fontWeight={700} display="block" gutterBottom>
+                    When to Escalate
+                  </Typography>
+                  <Typography variant="body2">{result.patientResponse.response.WhenToEscalate}</Typography>
+                </Alert>
+              )}
+
+              {/* Resources */}
+              {result.patientResponse.response?.ResourcesProvided?.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Resources
+                  </Typography>
+                  {result.patientResponse.response.ResourcesProvided.map((r, i) => (
+                    <Typography key={i} variant="body2" sx={{ lineHeight: 1.7 }}>• {r}</Typography>
+                  ))}
+                </Box>
+              )}
+
             </Box>
-          ) : (
-            <Typography variant="body2" sx={{ pb: 1.5, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-              {result.summary}
+          </Collapse>
+        </Box>
+      )}
+
+      {result.patientResponse && result.summary && <Divider />}
+
+      {/* Summary */}
+      {result.summary && (
+        <Box sx={{ px: 2.5, py: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", py: 0.5 }} onClick={() => setSummaryOpen((o) => !o)}>
+            <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: 0.8 }}>
+              Clinical Summary
             </Typography>
-          )}
-        </Collapse>
-      </Box>
+            <IconButton size="small">{summaryOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
+          </Box>
+          <Collapse in={summaryOpen}>
+            {typeof result.summary === "object" && result.summary !== null ? (
+              <Box sx={{ pb: 1.5 }}>
+                {Object.entries(result.summary).map(([key, value]) => (
+                  <Box key={key} sx={{ mb: 1 }}>
+                    <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: 0.8 }}>
+                      {key}
+                    </Typography>
+                    <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                      {Array.isArray(value) ? value.join(", ") : String(value || "Not mentioned")}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" sx={{ pb: 1.5, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                {result.summary}
+              </Typography>
+            )}
+          </Collapse>
+        </Box>
+      )}
 
       {/* Cited Records */}
       {result.citedRecords?.length > 0 && (
@@ -317,6 +478,8 @@ function SelfResultCard({ result }) {
 SelfResultCard.propTypes = {
   result: PropTypes.shape({
     error: PropTypes.string,
+    emergency: PropTypes.bool,
+    emergencyMessage: PropTypes.string,
     summary: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
     citedRecords: PropTypes.arrayOf(PropTypes.shape({
       id: PropTypes.string,
@@ -335,6 +498,22 @@ SelfResultCard.propTypes = {
         })
       ])
     ),
+    patientResponse: PropTypes.shape({
+      requiresRecordLookup: PropTypes.bool,
+      triageTier: PropTypes.string,
+      escalationRequired: PropTypes.bool,
+      followUpSuggested: PropTypes.bool,
+      response: PropTypes.shape({
+        EmergencyMessage: PropTypes.string,
+        Acknowledgement: PropTypes.string,
+        SymptomAssessment: PropTypes.string,
+        PossibleCauses: PropTypes.string,
+        RecommendedAction: PropTypes.string,
+        SelfCareGuidance: PropTypes.string,
+        WhenToEscalate: PropTypes.string,
+        ResourcesProvided: PropTypes.arrayOf(PropTypes.string),
+      }),
+    }),
   }).isRequired,
 };
 
@@ -417,13 +596,27 @@ function PatientChat() {
     const trimmed = query.trim();
     if (!trimmed || loading) return;
 
-    setMessages((prev) => [...prev, { role: "user", text: trimmed }]);
+    const updatedMessages = [...messages, { role: "user", text: trimmed }];
+    setMessages(updatedMessages);
     setQuery("");
     setLoading(true);
 
+    // Build history from the last 6 messages before the one just sent,
+    // excluding result cards which aren't text the agent can use
+    const historyForAgent = updatedMessages
+      .slice(-7, -1)
+      .filter((m) => m.role === "user" || m.role === "ai")
+      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", text: m.text }));
+
     try {
-      const data = await aiService.querySelf(trimmed);
-      setMessages((prev) => [...prev, { role: "result", result: data.result }]);
+      const data = await aiService.querySelf(trimmed, historyForAgent);
+
+      // Agent returned plain text (off-topic, clarification, etc.)
+      if (data.result?.agentMessage) {
+        setMessages((prev) => [...prev, { role: "ai", text: data.result.agentMessage }]);
+      } else {
+        setMessages((prev) => [...prev, { role: "result", result: data.result }]);
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -473,7 +666,7 @@ function PatientChat() {
             <Avatar sx={{ width: 30, height: 30, bgcolor: "text.primary", color: "#61dafb", fontSize: "0.65rem", fontWeight: "bold", flexShrink: 0 }}>AI</Avatar>
             <Box sx={{ px: 2, py: 1.5, borderRadius: "18px 18px 18px 4px", bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: 1 }}>
               <CircularProgress size={14} thickness={5} sx={{ color: "#61dafb" }} />
-              <Typography variant="body2" color="text.secondary">Analyzing your records…</Typography>
+              <Typography variant="body2" color="text.secondary">Processing your question…</Typography>
             </Box>
           </Box>
         )}
