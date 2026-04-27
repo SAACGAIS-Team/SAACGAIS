@@ -127,3 +127,21 @@ jobs:
 
             View the logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  tag-release:
+    runs-on: ubuntu-latest
+    needs: [ client, server ]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release tag
+        run: |
+          TAG="v$(date -u +%Y%m%d%H%M%S)"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag $TAG
+          git push origin $TAG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
