@@ -6,7 +6,6 @@ import Home from "./pages/Home.js";
 import Upload from "./pages/Upload.js";
 import SelectProvider from "./pages/SelectProvider.js";
 import ChangeRole from "./pages/ChangeRole.js";
-import About from "./pages/About.js";
 import ProviderChat from "./pages/ProviderChat.js";
 import PatientChat from "./pages/PatientChat.js";
 import Contact from "./pages/Contact.js";
@@ -107,8 +106,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route path="/about" element={<About />} />
 
           <Route path="/contact" element={<Contact />} />
 
