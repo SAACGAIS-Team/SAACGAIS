@@ -3,11 +3,14 @@ import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { useThemeMode } from "../context/ThemeContext.js";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
@@ -109,13 +112,27 @@ export default function Navbar() {
             </Button>
           )}
 
-          <Button color="inherit" component={Link} to="/about" sx={{ color: "white", fontSize: "12px" }}>
-            About
-          </Button>
-
           <Button color="inherit" component={Link} to="/contact" sx={{ color: "white", fontSize: "12px" }}>
             Contact
           </Button>
+
+          <Tooltip title="About" arrow>
+            <IconButton
+              component="a"
+              href="https://saacgais-team.github.io/SAACGAIS/"
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                color: "#888",
+                "&:hover": { color: "#61dafb", background: "rgba(97,218,251,0.08)" },
+                transition: "color 0.15s, background 0.15s",
+                ml: 0.5,
+              }}
+              size="small"
+            >
+              <HelpOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
 
           {/* Authenticated: avatar dropdown */}
           {isAuthenticated ? (

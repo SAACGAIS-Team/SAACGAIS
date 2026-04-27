@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Box,
-  Container,
   TextField,
   Button,
   Typography,
@@ -9,10 +8,11 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { apiConfig } from "../apiConfig.js";
+import PageCard from "../components/PageCard.js";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
-  const [status, setStatus] = useState(null); // "success" | "error"
+  const [status, setStatus] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -46,25 +46,25 @@ export default function Contact() {
   }
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Contact Us
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Have a question or need support? Send us a message and we&apos;ll get back
-          to you as soon as possible.
-        </Typography>
+    <PageCard maxWidth={600}>
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
+        Contact Us
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        Have a question or need support? Send us a message and we&apos;ll get
+        back to you as soon as possible.
+      </Typography>
 
-        {status === "success" && (
-          <Alert severity="success">
-            Your message has been sent. We&apos;ll be in touch soon.
-          </Alert>
-        )}
-        {status === "error" && (
-          <Alert severity="error">{errorMsg}</Alert>
-        )}
+      {status === "success" && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Your message has been sent. We&apos;ll be in touch soon.
+        </Alert>
+      )}
+      {status === "error" && (
+        <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>
+      )}
 
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
         <TextField
           label="Name"
           name="name"
@@ -95,16 +95,16 @@ export default function Contact() {
           rows={6}
           inputProps={{ maxLength: 5000 }}
         />
-
         <Button
           variant="contained"
           size="large"
           onClick={handleSubmit}
           disabled={loading || !form.name || !form.email || !form.message}
+          sx={{ mt: 1 }}
         >
           {loading ? <CircularProgress size={24} color="inherit" /> : "Send Message"}
         </Button>
       </Box>
-    </Container>
+    </PageCard>
   );
 }
