@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, development ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, development ]
 
 jobs:
   client:
@@ -17,10 +17,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'
 
       - name: Cache Node modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: app/client/node_modules
           key: ${{ runner.os }}-client-node-${{ hashFiles('app/client/package-lock.json') }}
@@ -30,6 +30,10 @@ jobs:
       - name: Install dependencies
         working-directory: app/client
         run: npm ci
+
+      - name: Audit dependencies
+        working-directory: app/client
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Lint
         working-directory: app/client
@@ -59,11 +63,15 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'
 
       - name: Install dependencies
         working-directory: app/server
         run: npm ci
+
+      - name: Audit dependencies
+        working-directory: app/server
+        run: npm audit --audit-level=high
 
       - name: Lint
         working-directory: app/server
@@ -72,3 +80,68 @@ jobs:
       - name: Unit Tests (mocked DB)
         working-directory: app/server
         run: npm test -- --ci --detectOpenHandles
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: [ client, server ]
+    if: failure()
+
+    steps:
+      - name: Notify Discord
+        run: |
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🚨 CI Failed",
+                "color": 15158332,
+                "fields": [
+                  { "name": "Repository", "value": "${{ github.repository }}", "inline": true },
+                  { "name": "Branch", "value": "${{ github.ref_name }}", "inline": true },
+                  { "name": "Triggered by", "value": "${{ github.actor }}", "inline": true },
+                  { "name": "Run", "value": "[View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false }
+                ]
+              }]
+            }'
+
+      - name: Notify via Email
+        uses: dawidd6/action-send-mail@v3
+        env:
+          SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          secure: false
+          username: ${{ secrets.SUPPORT_EMAIL }}
+          password: ${{ secrets.SUPPORT_EMAIL_PASSWORD }}
+          subject: "🚨 CI Failed — ${{ github.repository }} (${{ github.ref_name }})"
+          to: ${{ secrets.SUPPORT_EMAIL }}
+          from: "SAACGAIS CI <${{ secrets.SUPPORT_EMAIL }}>"
+          body: |
+            A CI run has failed.
+
+            Repository: ${{ github.repository }}
+            Branch:     ${{ github.ref_name }}
+            Commit:     ${{ github.sha }}
+            Triggered by: ${{ github.actor }}
+
+            View the logs:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  tag-release:
+    runs-on: ubuntu-latest
+    needs: [ client, server ]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release tag
+        run: |
+          TAG="v$(date -u +%Y%m%d%H%M%S)"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag $TAG
+          git push origin $TAG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,5 @@
 import express from "express";
+import logger from "../services/logger.js";
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import * as db from "../services/supabaseService.js";
@@ -65,7 +66,7 @@ async function extractTextFromFile(buffer, fileName) {
 
       return fullText.trim();
     } catch (err) {
-      console.error(`Failed to parse PDF ${fileName}:`, err.message);
+      logger.error("Failed to parse PDF", { fileName, error: err.message });
       return `[PDF could not be parsed: ${fileName}]`;
     }
   }
@@ -108,7 +109,6 @@ async function invokeAgent(agentId, agentAliasId, sessionId, inputText) {
   const jsonEnd = fullReply.lastIndexOf("}");
 
   if (jsonStart === -1 || jsonEnd === -1) {
-    // Return null to signal no JSON — caller handles the message
     return { parsed: null, rawMessage: fullReply.trim() };
   }
 
@@ -139,7 +139,7 @@ async function fetchPatientRecords(patientUid) {
           uploadedAt: file.Upload_Time,
         };
       } catch (err) {
-        console.error(`Failed to read S3 file ${file.S3_Key}:`, err.message);
+        logger.error("Failed to read S3 file", { s3Key: file.S3_Key, error: err.message });
         return null;
       }
     })
@@ -195,7 +195,7 @@ router.post("/query", async (req, res) => {
         try {
           records = await fetchPatientRecords(patientUid);
         } catch (err) {
-          console.error(`Failed to fetch records for ${patientUid}:`, err.message);
+          logger.error("Failed to fetch records for patient", { patientUid, error: err.message });
           return { patientUid, name: `${patient.firstName} ${patient.lastName}`, error: "Failed to fetch records" };
         }
 
@@ -222,8 +222,8 @@ router.post("/query", async (req, res) => {
 
           summaryResult = parsed;
         } catch (err) {
-          console.error(`Agent 1 failed for ${patientUid}:`, err.message);
-          return { patientUid, name: `${patient.firstName} ${patient.lastName}`, error: err.message };
+          logger.error("Agent 1 failed", { patientUid, error: err.message });
+          return { patientUid, name: `${patient.firstName} ${patient.lastName}`, error: "Clinical summary failed." };
         }
 
         const { summary, citedRecordIDs = [] } = summaryResult;
@@ -257,7 +257,7 @@ router.post("/query", async (req, res) => {
           );
           suggestionsResult = parsed || { suggestions: [] };
         } catch (err) {
-          console.error(`Agent 2 failed for ${patientUid}:`, err.message);
+          logger.error("Agent 2 failed", { patientUid, error: err.message });
           suggestionsResult = { suggestions: [] };
         }
 
@@ -273,16 +273,14 @@ router.post("/query", async (req, res) => {
 
     res.json({ ok: true, results });
   } catch (err) {
-    console.error("Error in AI query:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error in AI query", { error: err.message, providerUid });
+    res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 
 // ============================================
 // POST /api/ai/patient-self-query
 // Body: { query: string }
-// Patients query their own records only.
-// Agent 3 decides whether record lookup is needed.
 // ============================================
 router.post("/patient-self-query", async (req, res) => {
   const patientUid = req.user.sub;
@@ -327,36 +325,26 @@ router.post("/patient-self-query", async (req, res) => {
         `patient-intent-${patientUid}-${Date.now()}`,
         JSON.stringify({
           patientMessage: query,
-          sessionContext: {
-            conversationHistory,
-          },
+          sessionContext: { conversationHistory },
         })
       );
       phase1Response = parsed;
       phase1RawMessage = rawMessage;
     } catch (err) {
-      console.error("Agent 3 phase 1 failed:", err.message);
+      logger.error("Agent 3 phase 1 failed", { patientUid, error: err.message });
     }
 
-    // Agent 3 returned plain text instead of JSON (off-topic, clarification, etc.)
     if (!phase1Response && phase1RawMessage) {
       return res.json({
         ok: true,
-        result: {
-          patientUid,
-          agentMessage: phase1RawMessage,
-        },
+        result: { patientUid, agentMessage: phase1RawMessage },
       });
     }
 
-    // General question only — return Agent 3 response, skip record pipeline
     if (!phase1Response?.requiresRecordLookup) {
       return res.json({
         ok: true,
-        result: {
-          patientUid,
-          patientResponse: phase1Response,
-        },
+        result: { patientUid, patientResponse: phase1Response },
       });
     }
 
@@ -365,8 +353,8 @@ router.post("/patient-self-query", async (req, res) => {
     try {
       records = await fetchPatientRecords(patientUid);
     } catch (err) {
-      console.error(`Failed to fetch records for ${patientUid}:`, err.message);
-      return res.status(500).json({ error: "Failed to fetch your records" });
+      logger.error("Failed to fetch records for patient", { patientUid, error: err.message });
+      return res.status(500).json({ error: "Failed to fetch your records." });
     }
 
     let summaryResult;
@@ -391,8 +379,8 @@ router.post("/patient-self-query", async (req, res) => {
       }
       summaryResult = parsed;
     } catch (err) {
-      console.error(`Agent 1 failed for ${patientUid}:`, err.message);
-      return res.status(500).json({ error: err.message });
+      logger.error("Agent 1 failed in patient self-query", { patientUid, error: err.message });
+      return res.status(500).json({ error: "An unexpected error occurred." });
     }
 
     const { summary, citedRecordIDs = [] } = summaryResult;
@@ -420,12 +408,10 @@ router.post("/patient-self-query", async (req, res) => {
       );
       suggestionsResult = parsed || { suggestions: [] };
     } catch (err) {
-      console.error(`Agent 2 failed for ${patientUid}:`, err.message);
+      logger.error("Agent 2 failed in patient self-query", { patientUid, error: err.message });
       suggestionsResult = { suggestions: [] };
     }
 
-    // Only surface Agent 3's phase 1 response if it contains substantive
-    // clinical content — not just acknowledgement or record-retrieval placeholder text.
     const hasGeneralContent =
       phase1Response?.response?.SymptomAssessment ||
       phase1Response?.response?.PossibleCauses ||
@@ -442,8 +428,8 @@ router.post("/patient-self-query", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Error in patient self-query:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error in patient self-query", { patientUid, error: err.message });
+    res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 

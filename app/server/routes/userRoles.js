@@ -1,9 +1,13 @@
 import express from "express";
+import { body, param } from "express-validator";
 import * as cognito from "../services/cognitoService.js";
+import { handleValidation } from "../middleware/validate.js";
+import logger from "../services/logger.js";
 
 const router = express.Router();
 
-// GET /api/user-roles - List all available roles/groups
+const VALID_ROLES = ["Patient", "Healthcare-Provider", "Administrator"];
+
 router.get("/", async (req, res) => {
   try {
     const groups = await cognito.listGroups();
@@ -15,40 +19,43 @@ router.get("/", async (req, res) => {
     }));
     res.json({ ok: true, roles });
   } catch (err) {
-    console.error("Error listing roles:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error listing roles", { error: err.message });
+    res.status(500).json({ error: "Failed to list roles." });
   }
 });
 
-// GET /api/user-roles/:userId - Get user's current groups/roles
-router.get("/:userId", async (req, res) => {
-  try {
-    const roles = await cognito.getUserGroups(req.params.userId);
-    res.json({ ok: true, roles });
-  } catch (err) {
-    console.error("Error getting user roles:", err);
-    if (err.name === "UserNotFoundException") {
-      return res.status(404).json({ error: "User not found" });
+router.get("/:userId",
+  param("userId").trim().notEmpty().withMessage("userId is required"),
+  handleValidation,
+  async (req, res) => {
+    try {
+      const roles = await cognito.getUserGroups(req.params.userId);
+      res.json({ ok: true, roles });
+    } catch (err) {
+      logger.error("Error getting user roles", { error: err.message, userId: req.params.userId });
+      if (err.name === "UserNotFoundException") {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.status(500).json({ error: "Failed to get user roles." });
     }
-    res.status(500).json({ error: err.message });
   }
-});
+);
 
-// POST /api/user-roles - Change user's roles
-router.post("/", async (req, res) => {
-  const { targetUserId, newRoles } = req.body;
-
-  if (!targetUserId || !newRoles || !Array.isArray(newRoles)) {
-    return res.status(400).json({ error: "targetUserId and newRoles (array) are required" });
+router.post("/",
+  body("targetUserId").trim().notEmpty().withMessage("targetUserId is required"),
+  body("newRoles").isArray({ min: 1 }).withMessage("newRoles must be a non-empty array"),
+  body("newRoles.*").isIn(VALID_ROLES).withMessage(`Each role must be one of: ${VALID_ROLES.join(", ")}`),
+  handleValidation,
+  async (req, res) => {
+    const { targetUserId, newRoles } = req.body;
+    try {
+      await cognito.setUserGroups(targetUserId, newRoles);
+      res.json({ ok: true, message: "Roles changed successfully", newRoles });
+    } catch (err) {
+      logger.error("Error changing roles", { error: err.message, targetUserId });
+      res.status(500).json({ error: "Failed to change roles." });
+    }
   }
-
-  try {
-    await cognito.setUserGroups(targetUserId, newRoles);
-    res.json({ ok: true, message: "Roles changed successfully", newRoles });
-  } catch (err) {
-    console.error("Error changing roles:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+);
 
 export default router;

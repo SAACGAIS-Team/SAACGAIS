@@ -105,9 +105,8 @@ describe('Test routes', () => {
     const res = await agent
       .post('/api/user-roles')
       .send({
-        adminUserId: 'admin-123',
         targetUserId: 'user-456',
-        newRoles: ['Admin', 'Healthcare-Provider'],
+        newRoles: ['Administrator', 'Healthcare-Provider'], // was 'Admin'
       });
 
     expect(res.statusCode).toBe(200);
