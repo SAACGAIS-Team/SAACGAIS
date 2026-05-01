@@ -36,10 +36,6 @@ export default function Navbar() {
     navigate("/");
   };
 
-  // const handleLogin = () => {
-  //   navigate("/login");
-  // };
-
   const getInitials = () => {
     const first = user?.given_name?.[0] || "";
     const last = user?.family_name?.[0] || "";
@@ -61,125 +57,100 @@ export default function Navbar() {
     cursor: "pointer",
     borderRadius: "6px",
     fontSize: "13px",
-    color: "#e0e0e0",
+    color: darkMode ? "#e0e0e0" : "#1a1a1a",
     whiteSpace: "nowrap",
     transition: "background 0.15s",
   };
 
   return (
     <AppBar
-  position="static"
-  sx={{
-    background: "#ffffff",
-    color: "#0f172a",
-    boxShadow: "none",
-    borderBottom: "1px solid #e2e8f0",
-  }}
->
+      position="static"
+      sx={{
+        background: darkMode ? "#1a1a1a" : "#ffffff",
+        color: darkMode ? "#e0e0e0" : "#0f172a",
+        boxShadow: "none",
+        borderBottom: `1px solid ${darkMode ? "#2a2a2a" : "#e2e8f0"}`,
+      }}
+    >
       <Toolbar sx={{ gap: 1 }}>
-  {/* Logo */}
-<Box
-  component={Link}
-  to="/"
-  sx={{
-    flexGrow: 1,
-    display: "flex",
-    alignItems: "center",
-    gap: 1.25,
-    textDecoration: "none",
-  }}
->
-  <Box
-    sx={{
-      width: 42,
-      height: 42,
-      borderRadius: 2.5,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "rgba(97, 218, 251, 0.08)",
-      border: "1px solid rgba(97, 218, 251, 0.18)",
-      flexShrink: 0,
-    }}
-  >
-    <Box
-  component="img"
-  src="/logo-navbar.svg"
-  alt="SAACGAIS logo"
-  sx={{
-    width: 60,
-    height: 60,
-    objectFit: "contain",
-    display: "block",
-  }}
-/>
-  </Box>
-
-</Box>
+        {/* Logo */}
+        <Box
+          component={Link}
+          to="/"
+          sx={{
+            flexGrow: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.25,
+            textDecoration: "none",
+          }}
+        >
+          <Box
+            sx={{
+              width: 42,
+              height: 42,
+              borderRadius: 2.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(97, 218, 251, 0.08)",
+              border: "1px solid rgba(97, 218, 251, 0.18)",
+              flexShrink: 0,
+            }}
+          >
+            <Box
+              component="img"
+              src="/logo-navbar.svg"
+              alt="SAACGAIS logo"
+              sx={{ width: 60, height: 60, objectFit: "contain", display: "block" }}
+            />
+          </Box>
+        </Box>
 
         {/* Nav links */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Button color="inherit" component={Link} to="/"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+          <Button color="inherit" component={Link} to="/" sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}>
             Home
           </Button>
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/upload"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+            <Button color="inherit" component={Link} to="/upload" sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               Upload
             </Button>
           )}
 
-          {(userGroups.includes("Healthcare-Provider")) && (
-            <Button color="inherit" component={Link} to="/provider-chat"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+          {userGroups.includes("Healthcare-Provider") && (
+            <Button color="inherit" component={Link} to="/provider-chat" sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               AI: My Patients
             </Button>
           )}
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/patient-chat"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+            <Button color="inherit" component={Link} to="/patient-chat" sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               AI: My Records
             </Button>
           )}
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/select-provider"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+            <Button color="inherit" component={Link} to="/select-provider" sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               Select Provider
             </Button>
           )}
 
-          <Button color="inherit" component={Link} to="/contact"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+          <Button color="inherit" component={Link} to="/contact" sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}>
             Contact
           </Button>
 
-          {/* <Tooltip title="About" arrow>
-            <IconButton
-              component="a"
-              href="https://saacgais-team.github.io/SAACGAIS/"
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{
-                color: "#888",
-                "&:hover": { color: "#61dafb", background: "rgba(97,218,251,0.08)" },
-                transition: "color 0.15s, background 0.15s",
-                ml: 0.5,
-              }}
-              size="small"
-            >
-              <HelpOutlineIcon fontSize="small" />
-            </IconButton>
-          </Tooltip> */}
-
           <Button
-          color="inherit"
-          component="a"
-          href="https://saacgais-team.github.io/SAACGAIS/"
-          target="_blank"
-          rel="noopener noreferrer"
-          sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
-          About
-        </Button>
-
-
+            color="inherit"
+            component="a"
+            href="https://saacgais-team.github.io/SAACGAIS/"
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}
+          >
+            About
+          </Button>
 
           {/* Authenticated: avatar dropdown */}
           {isAuthenticated ? (
@@ -191,17 +162,16 @@ export default function Navbar() {
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  background: "#2a2a2a",
-                  border: "1px solid #3a3a3a",
+                  background: darkMode ? "#2a2a2a" : "#f1f5f9",
+                  border: `1px solid ${darkMode ? "#3a3a3a" : "#e2e8f0"}`,
                   borderRadius: "20px",
                   padding: "5px 12px 5px 6px",
                   cursor: "pointer",
                   userSelect: "none",
-                  "&:hover": { background: "#333" },
+                  "&:hover": { background: darkMode ? "#333" : "#e8eef5" },
                   transition: "background 0.15s",
                 }}
               >
-                {/* Initials avatar */}
                 <Box
                   sx={{
                     width: 28,
@@ -219,7 +189,7 @@ export default function Navbar() {
                 >
                   {getInitials()}
                 </Box>
-                <Typography sx={{ fontSize: "13px", color: "#ddd" }}>
+                <Typography sx={{ fontSize: "13px", color: darkMode ? "#ddd" : "#0f172a" }}>
                   {user?.given_name}
                 </Typography>
                 <Typography sx={{ fontSize: "10px", color: "#888", mt: "1px" }}>▼</Typography>
@@ -232,8 +202,8 @@ export default function Navbar() {
                     position: "absolute",
                     top: "calc(100% + 8px)",
                     right: 0,
-                    background: "#1e1e1e",
-                    border: "1px solid #333",
+                    background: darkMode ? "#1e1e1e" : "#ffffff",
+                    border: `1px solid ${darkMode ? "#333" : "#e2e8f0"}`,
                     borderRadius: "12px",
                     padding: "6px",
                     minWidth: "220px",
@@ -242,7 +212,7 @@ export default function Navbar() {
                   }}
                 >
                   {/* User info header */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px 10px", borderBottom: "1px solid #2a2a2a", mb: "4px" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px 10px", borderBottom: `1px solid ${darkMode ? "#2a2a2a" : "#e2e8f0"}`, mb: "4px" }}>
                     <Box
                       sx={{
                         width: 38,
@@ -261,10 +231,10 @@ export default function Navbar() {
                       {getInitials()}
                     </Box>
                     <Box>
-                      <Typography sx={{ fontSize: "13px", fontWeight: 500, color: "#eee", lineHeight: 1.3 }}>
+                      <Typography sx={{ fontSize: "13px", fontWeight: 500, color: darkMode ? "#eee" : "#0f172a", lineHeight: 1.3 }}>
                         {user?.given_name} {user?.family_name}
                       </Typography>
-                      <Typography sx={{ fontSize: "11px", color: "#888", lineHeight: 1.3 }}>
+                      <Typography sx={{ fontSize: "11px", color: darkMode ? "#888" : "#64748b", lineHeight: 1.3 }}>
                         {user?.email}
                       </Typography>
                     </Box>
@@ -274,7 +244,7 @@ export default function Navbar() {
                   <Box
                     sx={menuItemStyle}
                     onClick={() => { navigate("/account-settings"); setMenuOpen(false); }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#2a2a2a"}
+                    onMouseEnter={(e) => e.currentTarget.style.background = darkMode ? "#2a2a2a" : "#f1f5f9"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     <SettingsIcon sx={{ fontSize: 16, color: "#888" }} />
@@ -286,7 +256,7 @@ export default function Navbar() {
                     <Box
                       sx={menuItemStyle}
                       onClick={() => { navigate("/change-role"); setMenuOpen(false); }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#2a2a2a"}
+                      onMouseEnter={(e) => e.currentTarget.style.background = darkMode ? "#2a2a2a" : "#f1f5f9"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                     >
                       <SupervisorAccountIcon sx={{ fontSize: 16, color: "#888" }} />
@@ -298,7 +268,7 @@ export default function Navbar() {
                   <Box
                     sx={{ ...menuItemStyle, justifyContent: "space-between" }}
                     onClick={() => setDarkMode((d) => !d)}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#2a2a2a"}
+                    onMouseEnter={(e) => e.currentTarget.style.background = darkMode ? "#2a2a2a" : "#f1f5f9"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -311,7 +281,7 @@ export default function Navbar() {
                         width: 32,
                         height: 18,
                         borderRadius: "9px",
-                        background: darkMode ? "#38bdf8" : "#444",
+                        background: darkMode ? "#38bdf8" : "#cbd5e1",
                         position: "relative",
                         transition: "background 0.2s",
                         flexShrink: 0,
@@ -333,11 +303,11 @@ export default function Navbar() {
                   </Box>
 
                   {/* Logout */}
-                  <Box sx={{ borderTop: "1px solid #2a2a2a", mt: "4px", pt: "4px" }}>
+                  <Box sx={{ borderTop: `1px solid ${darkMode ? "#2a2a2a" : "#e2e8f0"}`, mt: "4px", pt: "4px" }}>
                     <Box
                       sx={{ ...menuItemStyle, color: "#f87171" }}
                       onClick={handleLogout}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "#2a1a1a"}
+                      onMouseEnter={(e) => e.currentTarget.style.background = darkMode ? "#2a1a1a" : "#fff5f5"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                     >
                       <span style={{ fontSize: "15px" }}>→</span>
@@ -349,12 +319,13 @@ export default function Navbar() {
             </Box>
           ) : (
             <Button
-            color="inherit"
-            component={Link}
-            to="/login"
-            sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
-            Login
-          </Button>
+              color="inherit"
+              component={Link}
+              to="/login"
+              sx={{ color: darkMode ? "#e0e0e0" : "#0f172a", fontSize: "12px", fontWeight: 700 }}
+            >
+              Login
+            </Button>
           )}
         </Box>
       </Toolbar>
