@@ -26,8 +26,17 @@ describe("Navbar component", () => {
 
     expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /contact/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /about/i })).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /login/i })).toBeInTheDocument();
+    const aboutLink = screen.getByRole("link", { name: /about/i });
+    expect(aboutLink).toBeInTheDocument();
+    expect(aboutLink).toHaveAttribute(
+      "href",
+      "https://saacgais-team.github.io/SAACGAIS/"
+    );
+    expect(aboutLink).toHaveAttribute("target", "_blank");
+
+    const loginLink = screen.getByRole("link", { name: /login/i });
+    expect(loginLink).toBeInTheDocument();
+    expect(loginLink).toHaveAttribute("href", "/login");
   });
 });

@@ -36,9 +36,9 @@ export default function Navbar() {
     navigate("/");
   };
 
-  const handleLogin = () => {
-    navigate("/login");
-  };
+  // const handleLogin = () => {
+  //   navigate("/login");
+  // };
 
   const getInitials = () => {
     const first = user?.given_name?.[0] || "";
@@ -169,9 +169,15 @@ export default function Navbar() {
             </IconButton>
           </Tooltip> */}
 
-          <Button color="inherit" component={Link} to="#about" sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
-            About
-          </Button>
+          <Button
+          color="inherit"
+          component="a"
+          href="https://saacgais-team.github.io/SAACGAIS/"
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+          About
+        </Button>
 
 
 
@@ -342,9 +348,13 @@ export default function Navbar() {
               )}
             </Box>
           ) : (
-            <Button color="inherit"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }} onClick={handleLogin}>
-              Login
-            </Button>
+            <Button
+            color="inherit"
+            component={Link}
+            to="/login"
+            sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+            Login
+          </Button>
           )}
         </Box>
       </Toolbar>
