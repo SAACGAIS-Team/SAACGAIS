@@ -13,7 +13,7 @@ jest.mock("../context/AuthContext.js", () => ({
 }));
 
 describe("Navbar component", () => {
-  test("renders brand title and basic navigation buttons", () => {
+  test("renders logo and basic navigation buttons when logged out", () => {
     render(
       <MemoryRouter>
         <ThemeProvider>
@@ -22,21 +22,12 @@ describe("Navbar component", () => {
       </MemoryRouter>
     );
 
-    // Verify brand logo
-    const brandLogo = screen.getByAltText(/SAACGAIS logo/i);
-    expect(brandLogo).toBeInTheDocument();
-    
-    // Verify standard links
+    expect(screen.getByAltText(/SAACGAIS logo/i)).toBeInTheDocument();
+
     expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
-    
-    // Verify About icon button (external link)
-    const aboutLink = screen.getByRole("link", { 
-      href: "https://saacgais-team.github.io/SAACGAIS/" 
-    });
-    expect(aboutLink).toBeInTheDocument();
-    expect(aboutLink).toHaveAttribute("target", "_blank");
-    
-    // Verify login button exists when unauthenticated
+    expect(screen.getByRole("link", { name: /contact/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /about/i })).toBeInTheDocument();
+
     expect(screen.getByRole("button", { name: /login/i })).toBeInTheDocument();
   });
 });
