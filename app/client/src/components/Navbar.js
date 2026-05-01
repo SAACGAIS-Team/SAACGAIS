@@ -106,63 +106,51 @@ export default function Navbar() {
     }}
   >
     <Box
-      component="img"
-      src="/logo-navbar.svg"
-      alt="SAACGAIS logo"
-      sx={{
-        width: 28,
-        height: 28,
-        objectFit: "contain",
-        display: "block",
-      }}
-    />
+  component="img"
+  src="/logo-navbar.svg"
+  alt="SAACGAIS logo"
+  sx={{
+    width: 60,
+    height: 60,
+    objectFit: "contain",
+    display: "block",
+  }}
+/>
   </Box>
-
-  <Typography
-    variant="h6"
-    sx={{
-      color: "#61dafb",
-      fontWeight: 800,
-      letterSpacing: 0.4,
-      fontSize: "1.75rem",
-    }}
-  >
-    SAACGAIS
-  </Typography>
 
 </Box>
 
         {/* Nav links */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Button color="inherit" component={Link} to="/" sx={{ color: "white", fontSize: "12px" }}>
+          <Button color="inherit" component={Link} to="/"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
             Home
           </Button>
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/upload" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/upload"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               Upload
             </Button>
           )}
 
           {(userGroups.includes("Healthcare-Provider")) && (
-            <Button color="inherit" component={Link} to="/provider-chat" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/provider-chat"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               AI: My Patients
             </Button>
           )}
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/patient-chat" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/patient-chat"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               AI: My Records
             </Button>
           )}
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/select-provider" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/select-provider"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               Select Provider
             </Button>
           )}
 
-          <Button color="inherit" component={Link} to="/contact" sx={{ color: "white", fontSize: "12px" }}>
+          <Button color="inherit" component={Link} to="/contact"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
             Contact
           </Button>
 
@@ -351,7 +339,7 @@ export default function Navbar() {
               )}
             </Box>
           ) : (
-            <Button color="inherit" sx={{ color: "white", fontSize: "12px" }} onClick={handleLogin}>
+            <Button color="inherit"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }} onClick={handleLogin}>
               Login
             </Button>
           )}
