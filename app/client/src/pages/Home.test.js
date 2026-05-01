@@ -8,6 +8,10 @@ jest.mock("../context/AuthContext", () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock("../context/ThemeContext.js", () => ({
+  useThemeMode: () => ({ darkMode: false }),
+}));
+
 function renderHome() {
   return render(
     <MemoryRouter>
