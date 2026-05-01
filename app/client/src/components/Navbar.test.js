@@ -4,10 +4,9 @@ import { MemoryRouter } from "react-router-dom";
 import Navbar from "./Navbar";
 import { ThemeProvider } from "../context/ThemeContext";
 
-// 1. Mock your custom AuthContext
 jest.mock("../context/AuthContext.js", () => ({
   useAuth: () => ({
-    user: null, // Start with unauthenticated state
+    user: null,
     isAuthenticated: false,
     logout: jest.fn(),
   }),
@@ -23,14 +22,19 @@ describe("Navbar component", () => {
       </MemoryRouter>
     );
 
-    // Verify brand
     // Verify brand logo
     const brandLogo = screen.getByAltText(/SAACGAIS logo/i);
     expect(brandLogo).toBeInTheDocument();
     
     // Verify standard links
     expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { title: /about/i })).toBeInTheDocument();
+    
+    // Verify About icon button (external link)
+    const aboutLink = screen.getByRole("link", { 
+      href: "https://saacgais-team.github.io/SAACGAIS/" 
+    });
+    expect(aboutLink).toBeInTheDocument();
+    expect(aboutLink).toHaveAttribute("target", "_blank");
     
     // Verify login button exists when unauthenticated
     expect(screen.getByRole("button", { name: /login/i })).toBeInTheDocument();
