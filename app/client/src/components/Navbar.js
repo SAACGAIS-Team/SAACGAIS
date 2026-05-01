@@ -70,17 +70,67 @@ export default function Navbar() {
   };
 
   return (
-    <AppBar position="static" sx={{ background: "#1a1a1a", boxShadow: "none", borderBottom: "1px solid #2a2a2a" }}>
+    <AppBar
+  position="static"
+  sx={{
+    background: "#ffffff",
+    color: "#0f172a",
+    boxShadow: "none",
+    borderBottom: "1px solid #e2e8f0",
+  }}
+>
       <Toolbar sx={{ gap: 1 }}>
-        {/* Logo */}
-        <Typography
-          variant="h6"
-          component={Link}
-          to="/"
-          sx={{ flexGrow: 1, textDecoration: "none", color: "#61dafb", fontWeight: "bold" }}
-        >
-          SAACGAIS
-        </Typography>
+  {/* Logo */}
+<Box
+  component={Link}
+  to="/"
+  sx={{
+    flexGrow: 1,
+    display: "flex",
+    alignItems: "center",
+    gap: 1.25,
+    textDecoration: "none",
+  }}
+>
+  <Box
+    sx={{
+      width: 42,
+      height: 42,
+      borderRadius: 2.5,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(97, 218, 251, 0.08)",
+      border: "1px solid rgba(97, 218, 251, 0.18)",
+      flexShrink: 0,
+    }}
+  >
+    <Box
+      component="img"
+      src="/logo-navbar.svg"
+      alt="SAACGAIS logo"
+      sx={{
+        width: 28,
+        height: 28,
+        objectFit: "contain",
+        display: "block",
+      }}
+    />
+  </Box>
+
+  <Typography
+    variant="h6"
+    sx={{
+      color: "#61dafb",
+      fontWeight: 800,
+      letterSpacing: 0.4,
+      fontSize: "1.75rem",
+    }}
+  >
+    SAACGAIS
+  </Typography>
+
+</Box>
 
         {/* Nav links */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
