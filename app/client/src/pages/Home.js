@@ -287,7 +287,7 @@ function Home() {
         <Box sx={{ px: { xs: 3, sm: 5, md: 8 }, py: { xs: 8, md: 10 } }}>
           <Box sx={{ maxWidth: 1200, mx: "auto" }}>
             <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>
-              Your Dashboard
+              Welcome to SAACGAIS
             </Typography>
 
             {userGroups.length > 0 ? (

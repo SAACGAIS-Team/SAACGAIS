@@ -24,8 +24,9 @@ describe("Navbar component", () => {
     );
 
     // Verify brand
-    const brand = screen.getByText("SAACGAIS");
-    expect(brand).toBeInTheDocument();
+    // Verify brand logo
+    const brandLogo = screen.getByAltText(/SAACGAIS logo/i);
+    expect(brandLogo).toBeInTheDocument();
     
     // Verify standard links
     expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
