@@ -10,10 +10,12 @@ import {
   Divider,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { useThemeMode } from "../context/ThemeContext.js";
 import { useAuth } from "../context/AuthContext.js";
 
 function Home() {
   const { user, isAuthenticated } = useAuth();
+  const { darkMode } = useThemeMode();
   const userGroups = user?.groups || [];
 
   return (
@@ -21,7 +23,9 @@ function Home() {
       {/* Hero Section */}
       <Box
         sx={{
-          background: "linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%)",
+          background: darkMode
+            ? "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)"
+            : "linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%)",
           px: { xs: 3, sm: 5, md: 8 },
           py: { xs: 8, md: 12 },
         }}
@@ -225,7 +229,9 @@ function Home() {
       {/* How It Works Section */}
       <Box
         sx={{
-          background: "linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%)",
+          background: darkMode
+            ? "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)"
+            : "linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%)",
           px: { xs: 3, sm: 5, md: 8 },
           py: { xs: 8, md: 10 },
         }}
@@ -282,8 +288,9 @@ function Home() {
         </Box>
       </Box>
 
+      {/* ADD BACK LATER IF DESIRED */}
       {/* Authenticated Dashboard Section */}
-      {isAuthenticated && (
+      {/* {isAuthenticated && (
         <Box sx={{ px: { xs: 3, sm: 5, md: 8 }, py: { xs: 8, md: 10 } }}>
           <Box sx={{ maxWidth: 1200, mx: "auto" }}>
             <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>
@@ -345,7 +352,7 @@ function Home() {
                       component={RouterLink}
                       to="/provider-chat"
                     >
-                      Provider Chat
+                      AI: My Patients
                     </Button>
                   )}
 
@@ -376,7 +383,7 @@ function Home() {
             )}
           </Box>
         </Box>
-      )}
+      )} */}
 
       {/* Footer */}
       <Box
