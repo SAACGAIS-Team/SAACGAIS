@@ -3,14 +3,11 @@ import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { useThemeMode } from "../context/ThemeContext.js";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.js";
@@ -70,53 +67,91 @@ export default function Navbar() {
   };
 
   return (
-    <AppBar position="static" sx={{ background: "#1a1a1a", boxShadow: "none", borderBottom: "1px solid #2a2a2a" }}>
+    <AppBar
+  position="static"
+  sx={{
+    background: "#ffffff",
+    color: "#0f172a",
+    boxShadow: "none",
+    borderBottom: "1px solid #e2e8f0",
+  }}
+>
       <Toolbar sx={{ gap: 1 }}>
-        {/* Logo */}
-        <Typography
-          variant="h6"
-          component={Link}
-          to="/"
-          sx={{ flexGrow: 1, textDecoration: "none", color: "#61dafb", fontWeight: "bold" }}
-        >
-          SAACGAIS
-        </Typography>
+  {/* Logo */}
+<Box
+  component={Link}
+  to="/"
+  sx={{
+    flexGrow: 1,
+    display: "flex",
+    alignItems: "center",
+    gap: 1.25,
+    textDecoration: "none",
+  }}
+>
+  <Box
+    sx={{
+      width: 42,
+      height: 42,
+      borderRadius: 2.5,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(97, 218, 251, 0.08)",
+      border: "1px solid rgba(97, 218, 251, 0.18)",
+      flexShrink: 0,
+    }}
+  >
+    <Box
+  component="img"
+  src="/logo-navbar.svg"
+  alt="SAACGAIS logo"
+  sx={{
+    width: 60,
+    height: 60,
+    objectFit: "contain",
+    display: "block",
+  }}
+/>
+  </Box>
+
+</Box>
 
         {/* Nav links */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Button color="inherit" component={Link} to="/" sx={{ color: "white", fontSize: "12px" }}>
+          <Button color="inherit" component={Link} to="/"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
             Home
           </Button>
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/upload" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/upload"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               Upload
             </Button>
           )}
 
           {(userGroups.includes("Healthcare-Provider")) && (
-            <Button color="inherit" component={Link} to="/provider-chat" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/provider-chat"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               AI: My Patients
             </Button>
           )}
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/patient-chat" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/patient-chat"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               AI: My Records
             </Button>
           )}
 
           {userGroups.includes("Patient") && (
-            <Button color="inherit" component={Link} to="/select-provider" sx={{ color: "white", fontSize: "12px" }}>
+            <Button color="inherit" component={Link} to="/select-provider"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
               Select Provider
             </Button>
           )}
 
-          <Button color="inherit" component={Link} to="/contact" sx={{ color: "white", fontSize: "12px" }}>
+          <Button color="inherit" component={Link} to="/contact"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
             Contact
           </Button>
 
-          <Tooltip title="About" arrow>
+          {/* <Tooltip title="About" arrow>
             <IconButton
               component="a"
               href="https://saacgais-team.github.io/SAACGAIS/"
@@ -132,7 +167,13 @@ export default function Navbar() {
             >
               <HelpOutlineIcon fontSize="small" />
             </IconButton>
-          </Tooltip>
+          </Tooltip> */}
+
+          <Button color="inherit" component={Link} to="#about" sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+            About
+          </Button>
+
+
 
           {/* Authenticated: avatar dropdown */}
           {isAuthenticated ? (
@@ -301,7 +342,7 @@ export default function Navbar() {
               )}
             </Box>
           ) : (
-            <Button color="inherit" sx={{ color: "white", fontSize: "12px" }} onClick={handleLogin}>
+            <Button color="inherit"  sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }} onClick={handleLogin}>
               Login
             </Button>
           )}
