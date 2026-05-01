@@ -154,7 +154,7 @@ export default function Navbar() {
             Contact
           </Button>
 
-          <Tooltip title="About" arrow>
+          {/* <Tooltip title="About" arrow>
             <IconButton
               component="a"
               href="https://saacgais-team.github.io/SAACGAIS/"
@@ -170,7 +170,13 @@ export default function Navbar() {
             >
               <HelpOutlineIcon fontSize="small" />
             </IconButton>
-          </Tooltip>
+          </Tooltip> */}
+
+          <Button color="inherit" component={Link} to="#about" sx={{ color: "#0f172a", fontSize: "12px", fontWeight: 700 }}>
+            About
+          </Button>
+
+
 
           {/* Authenticated: avatar dropdown */}
           {isAuthenticated ? (

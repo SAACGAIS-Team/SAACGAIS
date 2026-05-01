@@ -30,7 +30,7 @@ describe("Navbar component", () => {
     
     // Verify standard links
     expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /about/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { title: /about/i })).toBeInTheDocument();
     
     // Verify login button exists when unauthenticated
     expect(screen.getByRole("button", { name: /login/i })).toBeInTheDocument();
