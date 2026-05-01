@@ -129,7 +129,7 @@ FileViewDialog.propTypes = {
 
 // ── Main Upload Page ──────────────────────────────────────────────────────────
 export default function Upload() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
@@ -142,7 +142,7 @@ export default function Upload() {
   const [textHistory, setTextHistory] = useState([]);
 
   const [downloadingKey, setDownloadingKey] = useState(null);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const [viewTextDialog, setViewTextDialog] = useState(null);
   const [viewFileDialog, setViewFileDialog] = useState(null);
@@ -161,6 +161,7 @@ export default function Upload() {
   };
 
   useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
     const fetchHistory = async () => {
       setLoadingHistory(true);
       try {
@@ -176,8 +177,8 @@ export default function Upload() {
         setLoadingHistory(false);
       }
     };
-    if (isAuthenticated) fetchHistory();
-  }, [isAuthenticated]);
+    fetchHistory();
+  }, [isAuthenticated, isLoading]);
 
   const handleFileSelect = (e) => {
     const newFiles = Array.from(e.target.files);

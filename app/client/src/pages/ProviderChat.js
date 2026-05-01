@@ -420,7 +420,7 @@ MessageBubble.propTypes = {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 function ProviderChat() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const userGroups = user?.groups || [];
   const isProvider = userGroups.includes("Healthcare-Provider");
 
@@ -433,7 +433,7 @@ function ProviderChat() {
   const [patientOptions, setPatientOptions] = useState([]);
   const [patientInput, setPatientInput] = useState("");
   const [selectedPatients, setSelectedPatients] = useState([]);
-  const [patientPanelLoading, setPatientPanelLoading] = useState(true);
+  const [patientPanelLoading, setPatientPanelLoading] = useState(false);
 
   const messagesEndRef = useRef(null);
 
@@ -443,7 +443,7 @@ function ProviderChat() {
 
   // Load the provider's patient panel once on mount
   useEffect(() => {
-    if (!isProvider) return;
+    if (isLoading || !isProvider) return;
     const fetchPanel = async () => {
       try {
         setPatientPanelLoading(true);
@@ -463,7 +463,7 @@ function ProviderChat() {
       }
     };
     fetchPanel();
-  }, [isProvider]);
+  }, [isProvider, isLoading]);
 
   const handleSend = async () => {
     const trimmed = query.trim();
