@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Box, Button, Typography, TextField, CircularProgress,
-  Avatar, Chip, Autocomplete, Paper, Divider, Collapse, IconButton, Alert, Tooltip,
+  Avatar, Chip, Paper, Divider, Collapse, IconButton, Alert, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, Stack,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -11,11 +11,10 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ArticleIcon from "@mui/icons-material/Article";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
-import PersonIcon from "@mui/icons-material/Person";
 import DownloadIcon from "@mui/icons-material/Download";
 import PropTypes from "prop-types";
 import { useAuth } from "../context/AuthContext.js";
-import { aiService, providerService, uploadService } from "../api.js";
+import { aiService, uploadService } from "../api.js";
 import PageCard from "../components/PageCard.js";
 
 // ── Record View Dialog ────────────────────────────────────────────────────────
@@ -115,10 +114,7 @@ function RecordViewDialog({ rec, onClose }) {
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
         {rec.type === "text" ? (
-          <Button
-            variant="contained" startIcon={<ContentCopyIcon />}
-            onClick={handleCopy} disabled={state.loading || !!state.error}
-          >
+          <Button variant="contained" startIcon={<ContentCopyIcon />} onClick={handleCopy} disabled={state.loading || !!state.error}>
             {copied ? "Copied!" : "Copy"}
           </Button>
         ) : (
@@ -145,13 +141,21 @@ RecordViewDialog.propTypes = {
   onClose: PropTypes.func.isRequired,
 };
 
-// ── Result card for a single patient ─────────────────────────────────────────
-function PatientResultCard({ result }) {
+// ── Result card ───────────────────────────────────────────────────────────────
+function SelfResultCard({ result }) {
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [citationsOpen, setCitationsOpen] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
   const [viewingRec, setViewingRec] = useState(null);
+  const [responseOpen, setResponseOpen] = useState(true);
+
+  const TRIAGE_LABELS = {
+    "TIER 1": "Emergency",
+    "TIER 2": "Urgent",
+    "TIER 3": "Semi-Urgent",
+    "TIER 4": "Non-Urgent",
+  };
 
   const handleDownload = async (rec) => {
     if (rec.type !== "file") return;
@@ -174,54 +178,194 @@ function PatientResultCard({ result }) {
   };
 
   if (result.error) {
+    return <Alert severity="error" sx={{ mb: 1 }}>{result.error}</Alert>;
+  }
+
+  const hasContent =
+    result.emergency ||
+    result.patientResponse ||
+    result.summary ||
+    result.citedRecords?.length > 0 ||
+    result.suggestions?.length > 0;
+
+  if (!hasContent) {
     return (
-      <Alert severity="error" sx={{ mb: 1 }}>
-        <strong>{result.name}:</strong> {result.error}
+      <Alert severity="info" sx={{ mb: 1 }}>
+        No response could be generated. Please try rephrasing your question.
       </Alert>
     );
   }
 
   return (
     <Paper variant="outlined" sx={{ mb: 2, borderRadius: 2, overflow: "hidden", borderColor: "divider" }}>
-      {/* Patient header */}
-      <Box sx={{ px: 2.5, py: 1.5, bgcolor: "background.default", display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main", fontSize: "0.8rem" }}>
-          <PersonIcon sx={{ fontSize: 18 }} />
-        </Avatar>
-        <Typography variant="subtitle1" fontWeight={700}>{result.name}</Typography>
-      </Box>
 
-      <Divider />
+      {result.emergency && (
+        <Alert severity="error" icon={false} sx={{ m: 2, borderRadius: 1.5 }}>
+          <Typography variant="body2" fontWeight={700} gutterBottom>⚠️ Emergency</Typography>
+          <Typography variant="body2">{result.emergencyMessage}</Typography>
+        </Alert>
+      )}
 
-      {/* Summary */}
-      <Box sx={{ px: 2.5, py: 1 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", py: 0.5 }} onClick={() => setSummaryOpen((o) => !o)}>
-          <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: 0.8 }}>
-            Clinical Summary
-          </Typography>
-          <IconButton size="small">{summaryOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
-        </Box>
-        <Collapse in={summaryOpen}>
-          {typeof result.summary === "object" && result.summary !== null ? (
-            <Box sx={{ pb: 1.5 }}>
-              {Object.entries(result.summary).map(([key, value]) => (
-                <Box key={key} sx={{ mb: 1 }}>
-                  <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: 0.8 }}>
-                    {key}
+      {result.patientResponse && (
+        <Box sx={{ px: 2.5, py: 1, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: "8px 8px 0 0" }}>
+          <Box
+            sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", py: 0.5 }}
+            onClick={() => setResponseOpen((o) => !o)}
+          >
+            <Typography variant="body2" fontWeight={700} sx={{ fontSize: "0.75rem", letterSpacing: 0.6, textTransform: "uppercase" }}>
+              AI Response
+            </Typography>
+            <IconButton size="small" sx={{ color: "primary.contrastText" }}>
+              {responseOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </IconButton>
+          </Box>
+          <Collapse in={responseOpen}>
+            <Box sx={{ pb: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+
+              {/* Triage chip */}
+              {result.patientResponse.triageTier && (
+                <Chip
+                  size="small"
+                  label={TRIAGE_LABELS[result.patientResponse.triageTier] ?? result.patientResponse.triageTier}
+                  sx={{
+                    alignSelf: "flex-start",
+                    fontWeight: 700,
+                    fontSize: "0.65rem",
+                    color: "white",
+                    bgcolor:
+                      result.patientResponse.triageTier === "TIER 1" ? "error.main" :
+                        result.patientResponse.triageTier === "TIER 2" ? "warning.main" :
+                          result.patientResponse.triageTier === "TIER 3" ? "info.main" :
+                            "success.main",
+                  }}
+                />
+              )}
+
+              {/* Emergency fallback */}
+              {result.patientResponse.response?.EmergencyMessage && (
+                <Alert severity="error" sx={{ mt: 0.5 }}>
+                  {result.patientResponse.response.EmergencyMessage}
+                </Alert>
+              )}
+
+              {/* Acknowledgement */}
+              {result.patientResponse.response?.Acknowledgement && (
+                <Typography variant="body2" sx={{ lineHeight: 1.7, color: "primary.contrastText" }}>
+                  {result.patientResponse.response.Acknowledgement}
+                </Typography>
+              )}
+
+              {/* Symptom Assessment */}
+              {result.patientResponse.response?.SymptomAssessment && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Assessment
                   </Typography>
-                  <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {value || "Not mentioned"}
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.SymptomAssessment}
                   </Typography>
                 </Box>
-              ))}
+              )}
+
+              {/* Possible Causes */}
+              {result.patientResponse.response?.PossibleCauses && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Possible Causes
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.PossibleCauses}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Recommended Action */}
+              {result.patientResponse.response?.RecommendedAction && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Recommended Action
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.RecommendedAction}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Self Care */}
+              {result.patientResponse.response?.SelfCareGuidance && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Self-Care
+                  </Typography>
+                  <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+                    {result.patientResponse.response.SelfCareGuidance}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* When to Escalate */}
+              {result.patientResponse.response?.WhenToEscalate && (
+                <Alert
+                  severity={result.patientResponse.escalationRequired ? "error" : "warning"}
+                  sx={{ py: 0.5, bgcolor: "transparent", border: "1px solid", borderColor: result.patientResponse.escalationRequired ? "error.light" : "warning.light" }}
+                >
+                  <Typography variant="caption" fontWeight={700} display="block" gutterBottom>
+                    When to Escalate
+                  </Typography>
+                  <Typography variant="body2">{result.patientResponse.response.WhenToEscalate}</Typography>
+                </Alert>
+              )}
+
+              {/* Resources */}
+              {result.patientResponse.response?.ResourcesProvided?.length > 0 && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.75 }}>
+                    Resources
+                  </Typography>
+                  {result.patientResponse.response.ResourcesProvided.map((r, i) => (
+                    <Typography key={i} variant="body2" sx={{ lineHeight: 1.7 }}>• {r}</Typography>
+                  ))}
+                </Box>
+              )}
+
             </Box>
-          ) : (
-            <Typography variant="body2" sx={{ pb: 1.5, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-              {result.summary}
+          </Collapse>
+        </Box>
+      )}
+
+      {result.patientResponse && result.summary && <Divider />}
+
+      {/* Summary */}
+      {result.summary && (
+        <Box sx={{ px: 2.5, py: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", py: 0.5 }} onClick={() => setSummaryOpen((o) => !o)}>
+            <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: 0.8 }}>
+              Clinical Summary
             </Typography>
-          )}
-        </Collapse>
-      </Box>
+            <IconButton size="small">{summaryOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}</IconButton>
+          </Box>
+          <Collapse in={summaryOpen}>
+            {typeof result.summary === "object" && result.summary !== null ? (
+              <Box sx={{ pb: 1.5 }}>
+                {Object.entries(result.summary).map(([key, value]) => (
+                  <Box key={key} sx={{ mb: 1 }}>
+                    <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: "uppercase", fontSize: "0.65rem", letterSpacing: 0.8 }}>
+                      {key}
+                    </Typography>
+                    <Typography variant="body2" sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                      {Array.isArray(value) ? value.join(", ") : String(value || "Not mentioned")}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" sx={{ pb: 1.5, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                {result.summary}
+              </Typography>
+            )}
+          </Collapse>
+        </Box>
+      )}
 
       {/* Cited Records */}
       {result.citedRecords?.length > 0 && (
@@ -310,9 +454,7 @@ function PatientResultCard({ result }) {
                             </Box>
                             <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 0.5 }}>{s.suggestion}</Typography>
                             {s.rationale && (
-                              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-                                {s.rationale}
-                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.5 }}>{s.rationale}</Typography>
                             )}
                           </>
                         ) : (
@@ -327,18 +469,18 @@ function PatientResultCard({ result }) {
           </Box>
         </>
       )}
-      {viewingRec && (
-        <RecordViewDialog rec={viewingRec} onClose={() => setViewingRec(null)} />
-      )}
+
+      {viewingRec && <RecordViewDialog rec={viewingRec} onClose={() => setViewingRec(null)} />}
     </Paper>
   );
 }
 
-PatientResultCard.propTypes = {
+SelfResultCard.propTypes = {
   result: PropTypes.shape({
     error: PropTypes.string,
-    name: PropTypes.string,
-    summary: PropTypes.string,
+    emergency: PropTypes.bool,
+    emergencyMessage: PropTypes.string,
+    summary: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
     citedRecords: PropTypes.arrayOf(PropTypes.shape({
       id: PropTypes.string,
       type: PropTypes.string,
@@ -356,21 +498,35 @@ PatientResultCard.propTypes = {
         })
       ])
     ),
+    patientResponse: PropTypes.shape({
+      requiresRecordLookup: PropTypes.bool,
+      triageTier: PropTypes.string,
+      escalationRequired: PropTypes.bool,
+      followUpSuggested: PropTypes.bool,
+      response: PropTypes.shape({
+        EmergencyMessage: PropTypes.string,
+        Acknowledgement: PropTypes.string,
+        SymptomAssessment: PropTypes.string,
+        PossibleCauses: PropTypes.string,
+        RecommendedAction: PropTypes.string,
+        SelfCareGuidance: PropTypes.string,
+        WhenToEscalate: PropTypes.string,
+        ResourcesProvided: PropTypes.arrayOf(PropTypes.string),
+      }),
+    }),
   }).isRequired,
 };
 
 // ── Chat message bubble ───────────────────────────────────────────────────────
 function MessageBubble({ msg, userInitial }) {
-  if (msg.role === "results") {
+  if (msg.role === "result") {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, maxWidth: "100%" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
           <Avatar sx={{ width: 28, height: 28, bgcolor: "text.primary", color: "#61dafb", fontSize: "0.6rem", fontWeight: 700 }}>AI</Avatar>
-          <Typography variant="caption" color="text.secondary">
-            Analysis complete — {msg.results.length} patient{msg.results.length !== 1 ? "s" : ""}
-          </Typography>
+          <Typography variant="caption" color="text.secondary">Analysis complete</Typography>
         </Box>
-        {msg.results.map((r) => <PatientResultCard key={r.patientUid} result={r} />)}
+        <SelfResultCard result={msg.result} />
       </Box>
     );
   }
@@ -413,27 +569,22 @@ MessageBubble.propTypes = {
     role: PropTypes.string.isRequired,
     text: PropTypes.string,
     isError: PropTypes.bool,
-    results: PropTypes.array,
+    result: PropTypes.object,
   }).isRequired,
   userInitial: PropTypes.string.isRequired,
 };
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-function ProviderChat() {
-  const { user, isLoading } = useAuth();
+function PatientChat() {
+  const { user } = useAuth();
   const userGroups = user?.groups || [];
-  const isProvider = userGroups.includes("Healthcare-Provider");
+  const isPatient = userGroups.includes("Patient");
 
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Select patients from your panel and enter a clinical query. I'll analyze their records and provide a summary with suggestions." },
+    { role: "ai", text: "Ask me anything about your health records. I'll analyze your uploaded documents and provide a summary with suggestions." },
   ]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [patientOptions, setPatientOptions] = useState([]);
-  const [patientInput, setPatientInput] = useState("");
-  const [selectedPatients, setSelectedPatients] = useState([]);
-  const [patientPanelLoading, setPatientPanelLoading] = useState(false);
 
   const messagesEndRef = useRef(null);
 
@@ -441,42 +592,31 @@ function ProviderChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Load the provider's patient panel once on mount
-  useEffect(() => {
-    if (isLoading || !isProvider) return;
-    const fetchPanel = async () => {
-      try {
-        setPatientPanelLoading(true);
-        const data = await providerService.getMyPatients();
-        // Supabase RPC returns snake_case — normalize to match user search shape
-        const normalized = (data.patients || []).map((p) => ({
-          sub: p.sub,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          email: p.email,
-        }));
-        setPatientOptions(normalized);
-      } catch (e) {
-        console.error("Failed to load patient panel:", e);
-      } finally {
-        setPatientPanelLoading(false);
-      }
-    };
-    fetchPanel();
-  }, [isProvider, isLoading]);
-
   const handleSend = async () => {
     const trimmed = query.trim();
-    if (!trimmed || loading || selectedPatients.length === 0) return;
+    if (!trimmed || loading) return;
 
-    const patientNames = selectedPatients.map((p) => `${p.firstName} ${p.lastName}`).join(", ");
-    setMessages((prev) => [...prev, { role: "user", text: `Patients: ${patientNames}\n\n${trimmed}` }]);
+    const updatedMessages = [...messages, { role: "user", text: trimmed }];
+    setMessages(updatedMessages);
     setQuery("");
     setLoading(true);
 
+    // Build history from the last 6 messages before the one just sent,
+    // excluding result cards which aren't text the agent can use
+    const historyForAgent = updatedMessages
+      .slice(-7, -1)
+      .filter((m) => m.role === "user" || m.role === "ai")
+      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", text: m.text }));
+
     try {
-      const data = await aiService.queryPatients(trimmed, selectedPatients.map((p) => p.sub));
-      setMessages((prev) => [...prev, { role: "results", results: data.results }]);
+      const data = await aiService.querySelf(trimmed, historyForAgent);
+
+      // Agent returned plain text (off-topic, clarification, etc.)
+      if (data.result?.agentMessage) {
+        setMessages((prev) => [...prev, { role: "ai", text: data.result.agentMessage }]);
+      } else {
+        setMessages((prev) => [...prev, { role: "result", result: data.result }]);
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -492,13 +632,13 @@ function ProviderChat() {
   };
 
   const userInitial = user?.given_name?.[0]?.toUpperCase() || "U";
-  const canSend = query.trim() && selectedPatients.length > 0 && !loading;
+  const canSend = query.trim() && !loading;
 
-  if (!isProvider) {
+  if (!isPatient) {
     return (
       <PageCard>
         <Typography variant="h5" gutterBottom>Access Denied</Typography>
-        <Typography color="text.secondary">This page is only available to Healthcare Providers.</Typography>
+        <Typography color="text.secondary">This page is only available to Patients.</Typography>
       </PageCard>
     );
   }
@@ -511,7 +651,7 @@ function ProviderChat() {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Avatar sx={{ width: 36, height: 36, bgcolor: "#61dafb", color: "background.paper", fontSize: "1rem", fontWeight: "bold" }}>AI</Avatar>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>AI Assistant</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>AI Health Assistant</Typography>
             <Typography variant="caption" sx={{ color: "#4caf50" }}>● Online</Typography>
           </Box>
         </Box>
@@ -526,7 +666,7 @@ function ProviderChat() {
             <Avatar sx={{ width: 30, height: 30, bgcolor: "text.primary", color: "#61dafb", fontSize: "0.65rem", fontWeight: "bold", flexShrink: 0 }}>AI</Avatar>
             <Box sx={{ px: 2, py: 1.5, borderRadius: "18px 18px 18px 4px", bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: 1 }}>
               <CircularProgress size={14} thickness={5} sx={{ color: "#61dafb" }} />
-              <Typography variant="body2" color="text.secondary">Analyzing records…</Typography>
+              <Typography variant="body2" color="text.secondary">Processing your question…</Typography>
             </Box>
           </Box>
         )}
@@ -536,38 +676,6 @@ function ProviderChat() {
 
       {/* Input Area */}
       <Box sx={{ px: { xs: 2, sm: 4 }, py: 2, bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider", boxShadow: "0 -1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", gap: 1.5 }}>
-
-        {/* Patient picker */}
-        <Autocomplete
-          multiple
-          options={patientOptions}
-          loading={patientPanelLoading}
-          value={selectedPatients}
-          inputValue={patientInput}
-          onInputChange={(_, v) => setPatientInput(v)}
-          onChange={(_, v) => setSelectedPatients(v)}
-          isOptionEqualToValue={(a, b) => a.sub === b.sub}
-          getOptionLabel={(o) => `${o.firstName} ${o.lastName} (${o.email})`}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => (
-              <Chip {...getTagProps({ index })} key={option.sub} label={`${option.firstName} ${option.lastName}`} size="small" icon={<PersonIcon />} />
-            ))
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              size="small"
-              placeholder={selectedPatients.length === 0 ? "Search your patients…" : ""}
-              label="Patients"
-              InputProps={{
-                ...params.InputProps,
-                endAdornment: <>{patientPanelLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>,
-              }}
-            />
-          )}
-        />
-
-        {/* Query input */}
         <Box sx={{
           display: "flex", alignItems: "flex-end", gap: 1.5,
           bgcolor: "background.default", borderRadius: "24px", px: 2, py: 1,
@@ -576,12 +684,12 @@ function ProviderChat() {
         }}>
           <TextField
             multiline maxRows={5}
-            placeholder={selectedPatients.length === 0 ? "Select patients first…" : "Type a message… (Shift+Enter for new line)"}
+            placeholder="Ask about your health records… (Shift+Enter for new line)"
             variant="standard" fullWidth
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={selectedPatients.length === 0 || loading}
+            disabled={loading}
             InputProps={{ disableUnderline: true }}
             sx={{ "& .MuiInputBase-root": { fontSize: "0.95rem", lineHeight: 1.5, py: 0.5 } }}
           />
@@ -608,4 +716,4 @@ function ProviderChat() {
   );
 }
 
-export default ProviderChat;
+export default PatientChat;

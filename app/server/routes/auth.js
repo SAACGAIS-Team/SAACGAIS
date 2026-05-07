@@ -9,6 +9,7 @@ import {
   ResendConfirmationCodeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import * as cognito from "../services/cognitoService.js";
+import logger from "../services/logger.js";
 
 const router = express.Router();
 
@@ -78,7 +79,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Login error:", err);
+    logger.error("Login error", { error: err.message, errorName: err.name });
     if (err.name === "NotAuthorizedException") return res.status(401).json({ error: "Incorrect email or password." });
     if (err.name === "UserNotConfirmedException") return res.status(403).json({ error: "USER_NOT_CONFIRMED", email });
     if (err.name === "UserNotFoundException") return res.status(401).json({ error: "Incorrect email or password." });
@@ -109,10 +110,10 @@ router.post("/signup", async (req, res) => {
       Username: email,
       Password: password,
       UserAttributes: [
-        { Name: "email",        Value: email },
-        { Name: "given_name",   Value: given_name },
-        { Name: "family_name",  Value: family_name },
-        { Name: "birthdate",    Value: birthdate },
+        { Name: "email", Value: email },
+        { Name: "given_name", Value: given_name },
+        { Name: "family_name", Value: family_name },
+        { Name: "birthdate", Value: birthdate },
         { Name: "phone_number", Value: normalizedPhone },
       ],
     });
@@ -124,10 +125,10 @@ router.post("/signup", async (req, res) => {
       email,
     });
   } catch (err) {
-    console.error("Signup error:", err);
+    logger.error("Signup error", { error: err.message, errorName: err.name });
     if (err.name === "UsernameExistsException") return res.status(409).json({ error: "An account with this email already exists." });
-    if (err.name === "InvalidPasswordException") return res.status(400).json({ error: err.message });
-    if (err.name === "InvalidParameterException") return res.status(400).json({ error: err.message });
+    if (err.name === "InvalidPasswordException") return res.status(400).json({ error: err.message }); // safe — Cognito password policy message
+    if (err.name === "InvalidParameterException") return res.status(400).json({ error: err.message }); // safe — Cognito parameter validation message
     return res.status(500).json({ error: "Signup failed. Please try again." });
   }
 });
@@ -150,7 +151,7 @@ router.post("/confirm", async (req, res) => {
     await cognito.sendCommand(command);
     return res.status(200).json({ message: "Email confirmed. You can now log in." });
   } catch (err) {
-    console.error("Confirm error:", err);
+    logger.error("Confirm error", { error: err.message, errorName: err.name });
     if (err.name === "CodeMismatchException") return res.status(400).json({ error: "Invalid verification code." });
     if (err.name === "ExpiredCodeException") return res.status(400).json({ error: "Code expired. Please request a new one." });
     return res.status(500).json({ error: "Confirmation failed. Please try again." });
@@ -172,7 +173,7 @@ router.post("/resend-code", async (req, res) => {
     await cognito.sendCommand(command);
     return res.status(200).json({ message: "Verification code resent." });
   } catch (err) {
-    console.error("Resend error:", err);
+    logger.error("Resend error", { error: err.message, errorName: err.name });
     return res.status(500).json({ error: "Failed to resend code." });
   }
 });
@@ -197,7 +198,7 @@ router.post("/refresh", async (req, res) => {
 
     return res.status(200).json({ message: "Token refreshed." });
   } catch (err) {
-    console.error("Refresh error:", err);
+    logger.error("Refresh error", { error: err.message, errorName: err.name });
     res.clearCookie("access_token", CLEAR_OPTIONS);
     res.clearCookie("id_token", CLEAR_OPTIONS);
     res.clearCookie("refresh_token", CLEAR_OPTIONS);
@@ -219,14 +220,14 @@ router.get("/me", async (req, res) => {
     try {
       groups = await cognito.getUserGroups(attrs.sub);
     } catch (gErr) {
-      console.error("getUserGroups failed, falling back to ID token:", gErr);
+      logger.error("getUserGroups failed, falling back to ID token", { error: gErr.message });
       const idToken = req.cookies?.id_token;
       if (idToken) {
         try {
           const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64url").toString());
           groups = payload["cognito:groups"] || [];
         } catch (parseErr) {
-          console.error("Failed to parse ID token for fallback:", parseErr);
+          logger.error("Failed to parse ID token for fallback", { error: parseErr.message });
         }
       }
     }
@@ -255,7 +256,7 @@ router.post("/logout", async (req, res) => {
       const command = new GlobalSignOutCommand({ AccessToken: accessToken });
       await cognito.sendCommand(command);
     } catch (err) {
-      console.warn("GlobalSignOut failed (token may already be expired):", err.message);
+      logger.warn("GlobalSignOut failed (token may already be expired)", { error: err.message });
     }
   }
 

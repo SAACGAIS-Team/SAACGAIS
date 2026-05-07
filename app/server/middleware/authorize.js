@@ -1,3 +1,5 @@
+import logger from "../services/logger.js";
+
 export default function authorize() {
   return async function (req, res, next) {
     if (!req.authz) {
@@ -5,8 +7,9 @@ export default function authorize() {
     }
 
     try {
+      const opaUrl = process.env.OPA_URL || "http://localhost:8181";
       const response = await fetch(
-        "http://localhost:8181/v1/data/authz/allow",
+        `${opaUrl}/v1/data/authz/allow`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -26,7 +29,7 @@ export default function authorize() {
 
       next();
     } catch (err) {
-      console.error("OPA authorization error:", err);
+      logger.error("OPA authorization error", { error: err.message });
       return res.status(500).json({ error: "Authorization service failure" });
     }
   };

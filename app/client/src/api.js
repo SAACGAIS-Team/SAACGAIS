@@ -31,7 +31,10 @@ async function fetchWithAuth(endpoint, options = {}) {
   let data = contentType?.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const error = new Error(data.error || data.message || "Request failed");
+    const message = typeof data === "object"
+      ? (data.error || data.message || "Request failed")
+      : "Request failed";
+    const error = new Error(message);
     error.response = { status: response.status, data };
     throw error;
   }
@@ -84,6 +87,12 @@ export const aiService = {
       body: JSON.stringify({ query, patientIds }),
     });
   },
+  querySelf: async (query, conversationHistory = []) => {
+    return await fetchWithAuth(`${apiConfig.endpoints.ai}/patient-self-query`, {
+      method: "POST",
+      body: JSON.stringify({ query, conversationHistory }),
+    });
+  },
 };
 
 // ============================================
@@ -105,6 +114,14 @@ export const uploadService = {
     });
   },
 
+  deleteFile: async (id) => {
+    return await fetchWithAuth(`/upload/file/${id}`, { method: "DELETE" });
+  },
+
+  deleteText: async (id) => {
+    return await fetchWithAuth(`/upload/text/${id}`, { method: "DELETE" });
+  },
+
   getFileUploads: async () => {
     return await fetchWithAuth("/upload/file");
   },
@@ -113,18 +130,23 @@ export const uploadService = {
     return await fetchWithAuth("/upload/text");
   },
 
-  getSignedUrl: async (s3Key) => {
-    return await fetchWithAuth(`/upload/signed-url?key=${encodeURIComponent(s3Key)}`);
+  getTextById: async (id) => {
+    return await fetchWithAuth(`/upload/text/${id}`);
   },
 
-  downloadFile: async (s3Key) => {
-    const url = `${apiConfig.baseUrlAPI}/upload/download?key=${encodeURIComponent(s3Key)}`;
+  downloadFile: async (id) => {
+    const url = `${apiConfig.baseUrlAPI}/upload/download/${id}`;
     const token = getCsrfToken();
     const response = await fetch(url, {
       credentials: "include",
       headers: token ? { "X-CSRF-Token": token } : {},
     });
-    if (!response.ok) throw new Error("Download failed");
+    if (!response.ok) {
+      const data = await response.json();
+      const error = new Error(data.error || "Download failed");
+      error.response = { status: response.status, data };
+      throw error;
+    }
     return response.blob();
   },
 };

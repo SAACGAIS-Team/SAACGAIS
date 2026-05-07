@@ -1,5 +1,6 @@
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import * as cognito from "../services/cognitoService.js";
+import logger from "../services/logger.js";
 
 let verifier = null;
 function getVerifier() {
@@ -24,13 +25,13 @@ export default async function authenticate(req, res, next) {
     try {
       req.user.roles = await cognito.getUserGroups(payload.sub);
     } catch (gErr) {
-      console.error("Error fetching user roles in middleware:", gErr);
+      logger.error("Error fetching user roles in middleware", { error: gErr.message, userId: payload?.sub });
       req.user.roles = [];
     }
 
     next();
   } catch (err) {
-    console.error("Token verification failed:", err);
+    logger.error("Token verification failed", { error: err.message });
     return res.status(401).json({ error: "Unauthorized: invalid or expired token." });
   }
 }

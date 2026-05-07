@@ -1,4 +1,5 @@
 import express from "express";
+import logger from "../services/logger.js";
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import * as db from "../services/supabaseService.js";
@@ -65,7 +66,7 @@ async function extractTextFromFile(buffer, fileName) {
 
       return fullText.trim();
     } catch (err) {
-      console.error(`Failed to parse PDF ${fileName}:`, err.message);
+      logger.error("Failed to parse PDF", { fileName, error: err.message });
       return `[PDF could not be parsed: ${fileName}]`;
     }
   }
@@ -108,7 +109,6 @@ async function invokeAgent(agentId, agentAliasId, sessionId, inputText) {
   const jsonEnd = fullReply.lastIndexOf("}");
 
   if (jsonStart === -1 || jsonEnd === -1) {
-    // Return null to signal no JSON — caller handles the message
     return { parsed: null, rawMessage: fullReply.trim() };
   }
 
@@ -132,14 +132,14 @@ async function fetchPatientRecords(patientUid) {
         const buffer = await s3FileToBuffer(file.S3_Key);
         const content = await extractTextFromFile(buffer, file.File_Name);
         return {
-          id: file.S3_Key,
+          id: String(file.File_Upload_ID),
           type: "file",
           fileName: file.File_Name,
           content,
           uploadedAt: file.Upload_Time,
         };
       } catch (err) {
-        console.error(`Failed to read S3 file ${file.S3_Key}:`, err.message);
+        logger.error("Failed to read S3 file", { s3Key: file.S3_Key, error: err.message });
         return null;
       }
     })
@@ -195,7 +195,7 @@ router.post("/query", async (req, res) => {
         try {
           records = await fetchPatientRecords(patientUid);
         } catch (err) {
-          console.error(`Failed to fetch records for ${patientUid}:`, err.message);
+          logger.error("Failed to fetch records for patient", { patientUid, error: err.message });
           return { patientUid, name: `${patient.firstName} ${patient.lastName}`, error: "Failed to fetch records" };
         }
 
@@ -222,21 +222,21 @@ router.post("/query", async (req, res) => {
 
           summaryResult = parsed;
         } catch (err) {
-          console.error(`Agent 1 failed for ${patientUid}:`, err.message);
-          return { patientUid, name: `${patient.firstName} ${patient.lastName}`, error: err.message };
+          logger.error("Agent 1 failed", { patientUid, error: err.message });
+          return { patientUid, name: `${patient.firstName} ${patient.lastName}`, error: "Clinical summary failed." };
         }
 
         const { summary, citedRecordIDs = [] } = summaryResult;
 
-        const validRecordIds = new Set(records.map((r) => r.id));
+        const validRecordIds = new Set(records.map((r) => String(r.id)));
         const safeCitedRecordIDs = Array.isArray(citedRecordIDs)
-          ? citedRecordIDs.filter((id) => typeof id === "string" && validRecordIds.has(id))
+          ? citedRecordIDs.map(String).filter((id) => validRecordIds.has(id))
           : [];
 
         const citedRecords = records
-          .filter((r) => safeCitedRecordIDs.includes(r.id))
+          .filter((r) => safeCitedRecordIDs.includes(String(r.id)))
           .map((r) => ({
-            id: r.id,
+            id: String(r.id),
             type: r.type,
             fileName: r.fileName,
             uploadedAt: r.uploadedAt,
@@ -257,7 +257,7 @@ router.post("/query", async (req, res) => {
           );
           suggestionsResult = parsed || { suggestions: [] };
         } catch (err) {
-          console.error(`Agent 2 failed for ${patientUid}:`, err.message);
+          logger.error("Agent 2 failed", { patientUid, error: err.message });
           suggestionsResult = { suggestions: [] };
         }
 
@@ -273,8 +273,163 @@ router.post("/query", async (req, res) => {
 
     res.json({ ok: true, results });
   } catch (err) {
-    console.error("Error in AI query:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error in AI query", { error: err.message, providerUid });
+    res.status(500).json({ error: "An unexpected error occurred." });
+  }
+});
+
+// ============================================
+// POST /api/ai/patient-self-query
+// Body: { query: string }
+// ============================================
+router.post("/patient-self-query", async (req, res) => {
+  const patientUid = req.user.sub;
+  const userRoles = req.user.roles || [];
+  const { query, conversationHistory = [] } = req.body;
+
+  if (!userRoles.includes("Patient")) {
+    return res.status(403).json({ error: "Only patients can use this endpoint" });
+  }
+  if (!query?.trim()) {
+    return res.status(400).json({ error: "query is required" });
+  }
+
+  // ── Emergency pre-check ───────────────────────────────────────────────────
+  const EMERGENCY_KEYWORDS = [
+    "chest pain", "can't breathe", "cannot breathe", "heart attack",
+    "stroke", "unconscious", "overdose", "suicidal", "kill myself",
+    "severe bleeding", "seizure", "anaphylaxis", "allergic reaction",
+  ];
+  if (EMERGENCY_KEYWORDS.some((kw) => query.toLowerCase().includes(kw))) {
+    return res.json({
+      ok: true,
+      result: {
+        patientUid,
+        emergency: true,
+        emergencyMessage:
+          "This sounds like it could be a medical emergency. Please call 911 immediately " +
+          "or have someone take you to the nearest emergency room. Do not drive yourself. " +
+          "I am an AI assistant and cannot provide emergency medical care.",
+      },
+    });
+  }
+
+  try {
+    // ── Phase 1: Agent 3 — intent detection + general health response ─────────
+    let phase1Response = null;
+    let phase1RawMessage = null;
+    try {
+      const { parsed, rawMessage } = await invokeAgent(
+        process.env.AWS_AGENT3_ID,
+        process.env.AWS_AGENT3_ALIAS_ID,
+        `patient-intent-${patientUid}-${Date.now()}`,
+        JSON.stringify({
+          patientMessage: query,
+          sessionContext: { conversationHistory },
+        })
+      );
+      phase1Response = parsed;
+      phase1RawMessage = rawMessage;
+    } catch (err) {
+      logger.error("Agent 3 phase 1 failed", { patientUid, error: err.message });
+    }
+
+    if (!phase1Response && phase1RawMessage) {
+      return res.json({
+        ok: true,
+        result: { patientUid, agentMessage: phase1RawMessage },
+      });
+    }
+
+    if (!phase1Response?.requiresRecordLookup) {
+      return res.json({
+        ok: true,
+        result: { patientUid, patientResponse: phase1Response },
+      });
+    }
+
+    // ── Phase 2: Record pipeline — Agents 1 and 2 ─────────────────────────────
+    let records;
+    try {
+      records = await fetchPatientRecords(patientUid);
+    } catch (err) {
+      logger.error("Failed to fetch records for patient", { patientUid, error: err.message });
+      return res.status(500).json({ error: "Failed to fetch your records." });
+    }
+
+    let summaryResult;
+    try {
+      const { parsed, rawMessage } = await invokeAgent(
+        process.env.AWS_AGENT1_ID,
+        process.env.AWS_AGENT1_ALIAS_ID,
+        `summary-${patientUid}-${Date.now()}`,
+        JSON.stringify({
+          query,
+          records: records.map((r) => ({ id: r.id, content: r.content })),
+        })
+      );
+      if (!parsed || !validateSummaryResult(parsed)) {
+        return res.json({
+          ok: true,
+          result: {
+            patientUid,
+            error: rawMessage || "No relevant records found for this query.",
+          },
+        });
+      }
+      summaryResult = parsed;
+    } catch (err) {
+      logger.error("Agent 1 failed in patient self-query", { patientUid, error: err.message });
+      return res.status(500).json({ error: "An unexpected error occurred." });
+    }
+
+    const { summary, citedRecordIDs = [] } = summaryResult;
+
+    const validRecordIds = new Set(records.map((r) => String(r.id)));
+    const safeCitedRecordIDs = Array.isArray(citedRecordIDs)
+      ? citedRecordIDs.map(String).filter((id) => validRecordIds.has(id))
+      : [];
+    const citedRecords = records
+      .filter((r) => safeCitedRecordIDs.includes(String(r.id)))
+      .map((r) => ({
+        id: String(r.id),
+        type: r.type,
+        fileName: r.fileName,
+        uploadedAt: r.uploadedAt,
+      }));
+
+    let suggestionsResult;
+    try {
+      const { parsed } = await invokeAgent(
+        process.env.AWS_AGENT2_ID,
+        process.env.AWS_AGENT2_ALIAS_ID,
+        `suggestions-${patientUid}-${Date.now()}`,
+        JSON.stringify({ summary, patientAge: null, knownConditions: [] })
+      );
+      suggestionsResult = parsed || { suggestions: [] };
+    } catch (err) {
+      logger.error("Agent 2 failed in patient self-query", { patientUid, error: err.message });
+      suggestionsResult = { suggestions: [] };
+    }
+
+    const hasGeneralContent =
+      phase1Response?.response?.SymptomAssessment ||
+      phase1Response?.response?.PossibleCauses ||
+      phase1Response?.response?.SelfCareGuidance;
+
+    res.json({
+      ok: true,
+      result: {
+        patientUid,
+        patientResponse: hasGeneralContent ? phase1Response : null,
+        summary,
+        citedRecords,
+        suggestions: suggestionsResult.suggestions || [],
+      },
+    });
+  } catch (err) {
+    logger.error("Error in patient self-query", { patientUid, error: err.message });
+    res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 

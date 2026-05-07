@@ -78,7 +78,6 @@ export async function listUsersInGroup(groupName) {
 export async function listAllUsers() {
     const command = new ListUsersCommand({
         UserPoolId: USER_POOL_ID(),
-        AttributesToGet: ["given_name", "family_name", "email", "phone_number", "birthdate"],
         Limit: 60,
     });
     const response = await getClient().send(command);

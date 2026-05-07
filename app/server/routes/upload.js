@@ -1,9 +1,11 @@
 import express from "express";
 import multer from "multer";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
+import { body } from "express-validator";
+import { handleValidation } from "../middleware/validate.js";
 import * as db from "../services/supabaseService.js";
+import logger from "../services/logger.js";
 
 const router = express.Router();
 
@@ -44,7 +46,7 @@ const s3 = new S3Client({
 router.post("/file", (req, res, next) => {
   upload.array("files")(req, res, (err) => {
     if (err) {
-      return res.status(400).json({ error: err.message });
+      return res.status(400).json({ error: err.message }); // safe — multer validation message
     }
     next();
   });
@@ -69,33 +71,32 @@ router.post("/file", (req, res, next) => {
       }));
 
       await db.insertFileUpload(file.originalname, s3Key, patientId);
-      uploaded.push({ fileName: file.originalname, s3Key });
+      uploaded.push({ fileName: file.originalname });
     }
 
     res.json({ ok: true, uploaded });
   } catch (err) {
-    console.error("File upload error:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("File upload error", { error: err.message, userId: req.user?.sub });
+    res.status(500).json({ error: "Failed to upload file." });
   }
 });
 
 // POST /api/upload/text
-router.post("/text", async (req, res) => {
-  const patientId = req.user.sub;
-  const { text } = req.body;
-
-  if (!text || text.trim() === "") {
-    return res.status(400).json({ error: "Text content is required" });
+router.post("/text",
+  body("text").trim().notEmpty().withMessage("Text content is required").isLength({ max: 50000 }).withMessage("Text content exceeds maximum length"),
+  handleValidation,
+  async (req, res) => {
+    const patientId = req.user.sub;
+    const { text } = req.body;
+    try {
+      await db.insertTextUpload(text.trim(), patientId);
+      res.json({ ok: true, message: "Text saved successfully" });
+    } catch (err) {
+      logger.error("Text upload error", { error: err.message, userId: patientId });
+      res.status(500).json({ error: "Failed to save text." });
+    }
   }
-
-  try {
-    await db.insertTextUpload(text.trim(), patientId);
-    res.json({ ok: true, message: "Text saved successfully" });
-  } catch (err) {
-    console.error("Text upload error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+);
 
 // GET /api/upload/file
 router.get("/file", async (req, res) => {
@@ -103,8 +104,8 @@ router.get("/file", async (req, res) => {
     const data = await db.getFileUploads(req.user.sub);
     res.json({ ok: true, uploads: data });
   } catch (err) {
-    console.error("Error fetching file uploads:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error fetching file uploads", { error: err.message, userId: req.user?.sub });
+    res.status(500).json({ error: "Failed to fetch file uploads." });
   }
 });
 
@@ -114,48 +115,86 @@ router.get("/text", async (req, res) => {
     const data = await db.getTextUploads(req.user.sub);
     res.json({ ok: true, uploads: data });
   } catch (err) {
-    console.error("Error fetching text uploads:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error fetching text uploads", { error: err.message, userId: req.user?.sub });
+    res.status(500).json({ error: "Failed to fetch text uploads." });
   }
 });
 
-// GET /api/upload/signed-url
-router.get("/signed-url", async (req, res) => {
-  const { key } = req.query;
-  if (!key) return res.status(400).json({ error: "key is required" });
+// GET /api/upload/text/:id
+router.get("/text/:id", async (req, res) => {
+  const requesterId = req.user.sub;
+  const { id } = req.params;
 
   try {
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
-      Key: key,
-    });
-    const url = await getSignedUrl(s3, command, { expiresIn: 300 });
-    res.json({ ok: true, url });
+    const record = await db.getTextUploadById(id, requesterId);
+
+    if (record === null) {
+      return res.status(404).json({ error: "Record not found" });
+    }
+
+    res.json({ ok: true, text: record.Text_Content, uploadedAt: record.Upload_Time });
   } catch (err) {
-    console.error("Error generating signed URL:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Error fetching text upload by ID", { error: err.message, userId: requesterId, recordId: id });
+    res.status(500).json({ error: "Failed to fetch record." });
   }
 });
 
-// GET /api/upload/download
-router.get("/download", async (req, res) => {
-  const { key } = req.query;
-  if (!key) return res.status(400).json({ error: "key is required" });
-
-  const fileName = key.split("/").pop();
+// GET /api/upload/download/:id
+router.get("/download/:id", async (req, res) => {
+  const requesterId = req.user.sub;
+  const { id } = req.params;
 
   try {
+    const record = await db.getFileUploadById(id, requesterId);
+    if (!record) return res.status(403).json({ error: "Not found or access denied" });
+
     const command = new GetObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME,
-      Key: key,
+      Key: record.S3_Key,
     });
     const s3Response = await s3.send(command);
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${record.File_Name}"`);
     res.setHeader("Content-Type", s3Response.ContentType || "application/octet-stream");
     s3Response.Body.pipe(res);
   } catch (err) {
-    console.error("Download error:", err);
-    res.status(500).json({ error: err.message });
+    logger.error("Download error", { error: err.message, userId: requesterId, recordId: id });
+    res.status(500).json({ error: "Failed to download file." });
+  }
+});
+
+// DELETE /api/upload/file/:id
+router.delete("/file/:id", async (req, res) => {
+  const patientId = req.user.sub;
+  const { id } = req.params;
+
+  try {
+    const record = await db.getFileUploadByIdOwnerOnly(id, patientId);
+    if (!record) return res.status(404).json({ error: "File not found" });
+
+    await s3.send(new DeleteObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Key: record.S3_Key,
+    }));
+
+    await db.deleteFileUpload(id, patientId);
+    res.json({ ok: true, message: "File deleted successfully" });
+  } catch (err) {
+    logger.error("File delete error", { error: err.message, userId: patientId, recordId: id });
+    res.status(500).json({ error: "Failed to delete file." });
+  }
+});
+
+// DELETE /api/upload/text/:id
+router.delete("/text/:id", async (req, res) => {
+  const patientId = req.user.sub;
+  const { id } = req.params;
+
+  try {
+    await db.deleteTextUpload(id, patientId);
+    res.json({ ok: true, message: "Text deleted successfully" });
+  } catch (err) {
+    logger.error("Text delete error", { error: err.message, userId: patientId, recordId: id });
+    res.status(500).json({ error: "Failed to delete text." });
   }
 });
 
