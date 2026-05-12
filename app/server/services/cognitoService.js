@@ -36,7 +36,7 @@ export function attrsToObj(attributes) {
 
 export function formatUser(attrs, username) {
     return {
-        sub: username,
+        sub: attrs.sub || username,
         firstName: attrs.given_name || null,
         lastName: attrs.family_name || null,
         email: attrs.email || null,
