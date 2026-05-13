@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
       const timestamp = new Date().getTime();
       const res = await fetch(`${API}/auth/me?t=${timestamp}`, {
         credentials: "include",
-        headers: { 
+        headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache",
           "Expires": "0"
@@ -73,6 +73,15 @@ export function AuthProvider({ children }) {
       }
     };
     initialize();
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+      window.location.href = "/login";
+    };
+    window.addEventListener("auth:sessionExpired", handleSessionExpired);
+    return () => window.removeEventListener("auth:sessionExpired", handleSessionExpired);
   }, []);
 
   const login = useCallback(async (email, password) => {
@@ -147,9 +156,9 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     setIsLoggingOut(true);
     try {
-      await fetch(`${API}/auth/logout`, { 
-        method: "POST", 
-        credentials: "include" 
+      await fetch(`${API}/auth/logout`, {
+        method: "POST",
+        credentials: "include"
       });
     } catch (err) {
       console.warn("Logout request failed:", err);

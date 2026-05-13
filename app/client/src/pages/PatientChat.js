@@ -603,10 +603,45 @@ function PatientChat() {
 
     // Build history from the last 6 messages before the one just sent,
     // excluding result cards which aren't text the agent can use
+    // Build history from the last 6 messages before the one just sent.
+    // Result cards are serialized into a text summary so Agent 3 has the
+    // full conversational context it needs to classify follow-up messages.
     const historyForAgent = updatedMessages
       .slice(-7, -1)
-      .filter((m) => m.role === "user" || m.role === "ai")
-      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", text: m.text }));
+      .flatMap((m) => {
+        if (m.role === "user") {
+          return [{ role: "user", text: m.text }];
+        }
+        if (m.role === "ai") {
+          return [{ role: "assistant", text: m.text }];
+        }
+        if (m.role === "result") {
+          const r = m.result;
+          if (!r || r.error) return [];
+          if (r.summary) {
+            const summaryText =
+              typeof r.summary === "string" ? r.summary : JSON.stringify(r.summary);
+            return [{
+              role: "assistant",
+              text: `I provided a clinical summary of your health records. Summary: ${summaryText.slice(0, 400)}`,
+            }];
+          }
+          if (r.patientResponse?.response) {
+            const resp = r.patientResponse.response;
+            const parts = [
+              resp.Acknowledgement,
+              resp.SymptomAssessment,
+              resp.SelfCareGuidance,
+              resp.RecommendedAction,
+              Array.isArray(resp.ResourcesProvided) ? resp.ResourcesProvided.join(" ") : null,
+            ].filter(Boolean);
+            const text = parts.join(" ").trim().slice(0, 500);
+            return text ? [{ role: "assistant", text }] : [];
+          }
+          return [];
+        }
+        return [];
+      });
 
     try {
       const data = await aiService.querySelf(trimmed, historyForAgent);

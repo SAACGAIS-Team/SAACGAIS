@@ -13,25 +13,59 @@ const getCsrfToken = () => {
 // ============================================
 async function fetchWithAuth(endpoint, options = {}) {
   const url = `${apiConfig.baseUrlAPI}${endpoint}`;
-  const token = getCsrfToken();
 
-  const headers = {
-    "Content-Type": "application/json",
-    ...options.headers,
-    ...(token ? { "X-CSRF-Token": token } : {}),
+  const token = getCsrfToken();
+  const defaultOptions = {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "X-CSRF-Token": token } : {}),
+    },
   };
 
-  const response = await fetch(url, {
+  const mergedOptions = {
+    ...defaultOptions,
     ...options,
-    headers,
-    credentials: "include",
-  });
+    headers: { ...defaultOptions.headers, ...(options.headers || {}) },
+  };
 
-  const contentType = response.headers.get("content-type");
-  let data = contentType?.includes("application/json") ? await response.json() : await response.text();
+  let response = await fetch(url, mergedOptions);
+
+  // If the access token has expired, attempt a silent refresh and retry once.
+  if (response.status === 401) {
+    const refreshRes = await fetch(`${apiConfig.baseUrl}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (refreshRes.ok) {
+      // Token refreshed — retry the original request with a fresh CSRF token.
+      const newToken = getCsrfToken();
+      const retryOptions = {
+        ...mergedOptions,
+        headers: {
+          ...mergedOptions.headers,
+          ...(newToken ? { "X-CSRF-Token": newToken } : {}),
+        },
+      };
+      response = await fetch(url, retryOptions);
+    } else {
+      // Refresh failed — session is truly expired. Fire an event so
+      // AuthContext can clear state before redirecting, rather than
+      // navigating directly and leaving React state stale.
+      await fetch(`${apiConfig.baseUrl}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      window.dispatchEvent(new CustomEvent("auth:sessionExpired"));
+      return;
+    }
+  }
+
+  const data = response.status !== 204 ? await response.json() : {};
 
   if (!response.ok) {
-    const message = typeof data === "object"
+    const message = response.status !== 204
       ? (data.error || data.message || "Request failed")
       : "Request failed";
     const error = new Error(message);
