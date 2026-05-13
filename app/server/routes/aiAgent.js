@@ -14,15 +14,21 @@ import { pathToFileURL } from "url";
 const originalWarn = console.warn.bind(console);
 console.warn = (...args) => {
   if (typeof args[0] === "string" &&
-      args[0].includes("UnknownErrorException") &&
-      args[0].includes("Unable to load font data")) return;
+    args[0].includes("UnknownErrorException") &&
+    args[0].includes("Unable to load font data")) return;
   originalWarn(...args);
 };
 
-const _require = createRequire(import.meta.url);
-const STANDARD_FONT_DATA_URL = pathToFileURL(
-  path.join(path.dirname(_require.resolve("pdfjs-dist/package.json")), "standard_fonts", "/")
-).href;
+const STANDARD_FONT_DATA_URL = (() => {
+  try {
+    const _require = createRequire(import.meta.url);
+    return pathToFileURL(
+      path.join(path.dirname(_require.resolve("pdfjs-dist/package.json")), "standard_fonts", "/")
+    ).href;
+  } catch {
+    return "";
+  }
+})();
 
 const router = express.Router();
 
