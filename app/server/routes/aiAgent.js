@@ -4,6 +4,25 @@ import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-b
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import * as db from "../services/supabaseService.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { createRequire } from "module";
+import path from "path";
+import { pathToFileURL } from "url";
+
+// Suppress non-fatal font warnings — pdfjs-dist v5 attempts to load
+// Liberation fonts via file:// URL which Node.js fetch does not support.
+// Text extraction is unaffected since disableFontFace is set.
+const originalWarn = console.warn.bind(console);
+console.warn = (...args) => {
+  if (typeof args[0] === "string" &&
+      args[0].includes("UnknownErrorException") &&
+      args[0].includes("Unable to load font data")) return;
+  originalWarn(...args);
+};
+
+const _require = createRequire(import.meta.url);
+const STANDARD_FONT_DATA_URL = pathToFileURL(
+  path.join(path.dirname(_require.resolve("pdfjs-dist/package.json")), "standard_fonts", "/")
+).href;
 
 const router = express.Router();
 
@@ -53,7 +72,11 @@ async function extractTextFromFile(buffer, fileName) {
   if (ext.endsWith(".pdf")) {
     try {
       const uint8Array = new Uint8Array(buffer);
-      const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+      const loadingTask = pdfjsLib.getDocument({
+        data: uint8Array,
+        standardFontDataUrl: STANDARD_FONT_DATA_URL,
+        disableFontFace: true,
+      });
       const pdf = await loadingTask.promise;
 
       let fullText = "";
@@ -106,16 +129,36 @@ async function invokeAgent(agentId, agentAliasId, sessionId, inputText) {
   }
 
   const jsonStart = fullReply.indexOf("{");
-  const jsonEnd = fullReply.lastIndexOf("}");
+  if (jsonStart === -1) {
+    return { parsed: null, rawMessage: fullReply.trim() };
+  }
 
-  if (jsonStart === -1 || jsonEnd === -1) {
+  // Walk forward from the opening brace to find its matching closing brace,
+  // ignoring any trailing content Agent 3 appends after the JSON object.
+  let depth = 0;
+  let jsonEnd = -1;
+  for (let i = jsonStart; i < fullReply.length; i++) {
+    if (fullReply[i] === "{") depth++;
+    else if (fullReply[i] === "}") {
+      depth--;
+      if (depth === 0) { jsonEnd = i; break; }
+    }
+  }
+
+  if (jsonEnd === -1) {
     return { parsed: null, rawMessage: fullReply.trim() };
   }
 
   try {
-    return { parsed: JSON.parse(fullReply.slice(jsonStart, jsonEnd + 1)), rawMessage: null };
+    const rawJson = fullReply.slice(jsonStart, jsonEnd + 1);
+    return { parsed: JSON.parse(rawJson), rawMessage: null };
   } catch {
-    return { parsed: null, rawMessage: fullReply.trim() };
+    try {
+      const sanitized = sanitizeJsonString(fullReply.slice(jsonStart, jsonEnd + 1));
+      return { parsed: JSON.parse(sanitized), rawMessage: null };
+    } catch {
+      return { parsed: null, rawMessage: fullReply.trim() };
+    }
   }
 }
 
@@ -200,6 +243,24 @@ router.post("/query", async (req, res) => {
         }
 
         // ── Agent 1: Clinical Summary ──────────────────────────
+        // Possessive/browse phrases like "my asthma records" or "show me my files"
+        // cause Agent 1 to narrate instead of returning structured JSON.
+        // Normalize them into a clinical summarization request it can handle.
+        const RECORD_REQUEST_RE = /^(?:(?:show|get|give|list|view|see|check|pull|display)\s+(?:me\s+)?(?:my\s+)?|my\s+)/i;
+
+        let agent1Query = query;
+        if (RECORD_REQUEST_RE.test(query.trim())) {
+          // Strip the possessive/browse prefix, then strip trailing filler words
+          const stripped = query.trim()
+            .replace(RECORD_REQUEST_RE, "")
+            .replace(/\s+(records?|files?|documents?|history|uploads?|data)$/i, "")
+            .trim();
+
+          agent1Query = stripped
+            ? `Please summarize the patient's medical records related to ${stripped}.`
+            : "Please provide a comprehensive clinical summary of the patient's uploaded medical records and documents.";
+        }
+
         let summaryResult;
         try {
           const { parsed, rawMessage } = await invokeAgent(
@@ -207,7 +268,7 @@ router.post("/query", async (req, res) => {
             process.env.AWS_AGENT1_ALIAS_ID,
             `summary-${patientUid}-${Date.now()}`,
             JSON.stringify({
-              query,
+              query: agent1Query,
               records: records.map((r) => ({ id: r.id, content: r.content })),
             })
           );
@@ -335,10 +396,25 @@ router.post("/patient-self-query", async (req, res) => {
     }
 
     if (!phase1Response && phase1RawMessage) {
-      return res.json({
-        ok: true,
-        result: { patientUid, agentMessage: phase1RawMessage },
-      });
+      // invokeAgent failed to parse — attempt one more time on the raw message
+      // in case the agent output valid JSON with surrounding whitespace or text.
+      try {
+        const start = phase1RawMessage.indexOf("{");
+        const end = phase1RawMessage.lastIndexOf("}");
+        if (start !== -1 && end !== -1) {
+          const sanitized = sanitizeJsonString(phase1RawMessage.slice(start, end + 1));
+          phase1Response = JSON.parse(sanitized);
+        }
+      } catch {
+        // still not parseable — fall through to agentMessage
+      }
+
+      if (!phase1Response) {
+        return res.json({
+          ok: true,
+          result: { patientUid, agentMessage: phase1RawMessage },
+        });
+      }
     }
 
     if (!phase1Response?.requiresRecordLookup) {
@@ -357,6 +433,24 @@ router.post("/patient-self-query", async (req, res) => {
       return res.status(500).json({ error: "Failed to fetch your records." });
     }
 
+    // ── Agent 1: Clinical Summary ──────────────────────────
+    // Possessive/browse phrases like "my asthma records" or "show me my files"
+    // cause Agent 1 to narrate instead of returning structured JSON.
+    // Normalize them into a clinical summarization request it can handle.
+    const RECORD_REQUEST_RE = /^(?:(?:show|get|give|list|view|see|check|pull|display)\s+(?:me\s+)?(?:my\s+)?|my\s+)/i;
+
+    let agent1Query = query;
+    if (RECORD_REQUEST_RE.test(query.trim())) {
+      const stripped = query.trim()
+        .replace(RECORD_REQUEST_RE, "")
+        .replace(/\s+(records?|files?|documents?|history|uploads?|data)$/i, "")
+        .trim();
+
+      agent1Query = stripped
+        ? `Please summarize the patient's medical records related to ${stripped}.`
+        : "Please provide a comprehensive clinical summary of the patient's uploaded medical records and documents.";
+    }
+
     let summaryResult;
     try {
       const { parsed, rawMessage } = await invokeAgent(
@@ -364,7 +458,7 @@ router.post("/patient-self-query", async (req, res) => {
         process.env.AWS_AGENT1_ALIAS_ID,
         `summary-${patientUid}-${Date.now()}`,
         JSON.stringify({
-          query,
+          query: agent1Query,
           records: records.map((r) => ({ id: r.id, content: r.content })),
         })
       );
