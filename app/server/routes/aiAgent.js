@@ -19,6 +19,13 @@ console.warn = (...args) => {
   originalWarn(...args);
 };
 
+function sanitizeJsonString(str) {
+  return str
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+    .replace(/,\s*([}\]])/g, "$1")
+    .trim();
+}
+
 const STANDARD_FONT_DATA_URL = (() => {
   try {
     const _require = createRequire(import.meta.url);
@@ -283,7 +290,9 @@ router.post("/query", async (req, res) => {
             return {
               patientUid,
               name: `${patient.firstName} ${patient.lastName}`,
-              error: rawMessage || "No relevant records found for this query.",
+              agentMessage: parsed?.noRelevantRecords
+                ? (parsed.message || "No relevant records found for this query.")
+                : (rawMessage || "No relevant records found for this query."),
             };
           }
 
@@ -381,6 +390,9 @@ router.post("/patient-self-query", async (req, res) => {
     });
   }
 
+  // ── Possessive record detection — bypasses Agent 3 routing ───────────────
+  const POSSESSIVE_RECORD_RE = /\b(my|mine|i have|do i)\b.{0,30}\b(record|document|file|history|result|upload|visit|note|lab|test|medication|med|prescription)/i;
+
   try {
     // ── Phase 1: Agent 3 — intent detection + general health response ─────────
     let phase1Response = null;
@@ -403,7 +415,6 @@ router.post("/patient-self-query", async (req, res) => {
 
     if (!phase1Response && phase1RawMessage) {
       // invokeAgent failed to parse — attempt one more time on the raw message
-      // in case the agent output valid JSON with surrounding whitespace or text.
       try {
         const start = phase1RawMessage.indexOf("{");
         const end = phase1RawMessage.lastIndexOf("}");
@@ -412,7 +423,12 @@ router.post("/patient-self-query", async (req, res) => {
           phase1Response = JSON.parse(sanitized);
         }
       } catch {
-        // still not parseable — fall through to agentMessage
+        // still not parseable — fall through
+      }
+
+      // Even if parse failed, force record lookup for possessive queries
+      if (!phase1Response && POSSESSIVE_RECORD_RE.test(query)) {
+        phase1Response = { requiresRecordLookup: true };
       }
 
       if (!phase1Response) {
@@ -421,6 +437,11 @@ router.post("/patient-self-query", async (req, res) => {
           result: { patientUid, agentMessage: phase1RawMessage },
         });
       }
+    }
+
+    // Override Agent 3's routing decision for possessive queries
+    if (!phase1Response?.requiresRecordLookup && POSSESSIVE_RECORD_RE.test(query)) {
+      phase1Response = { ...phase1Response, requiresRecordLookup: true };
     }
 
     if (!phase1Response?.requiresRecordLookup) {
@@ -439,7 +460,7 @@ router.post("/patient-self-query", async (req, res) => {
       return res.status(500).json({ error: "Failed to fetch your records." });
     }
 
-    // ── Agent 1: Clinical Summary ──────────────────────────
+    // ── Agent 1: Clinical Summary ─────────────────────────────────────────────
     // Possessive/browse phrases like "my asthma records" or "show me my files"
     // cause Agent 1 to narrate instead of returning structured JSON.
     // Normalize them into a clinical summarization request it can handle.
@@ -469,12 +490,12 @@ router.post("/patient-self-query", async (req, res) => {
         })
       );
       if (!parsed || !validateSummaryResult(parsed)) {
+        const msg = parsed?.noRelevantRecords
+          ? (parsed.message || "No relevant records found for this query.")
+          : (rawMessage || "No relevant records found for this query.");
         return res.json({
           ok: true,
-          result: {
-            patientUid,
-            error: rawMessage || "No relevant records found for this query.",
-          },
+          result: { patientUid, agentMessage: msg },
         });
       }
       summaryResult = parsed;
@@ -512,16 +533,11 @@ router.post("/patient-self-query", async (req, res) => {
       suggestionsResult = { suggestions: [] };
     }
 
-    const hasGeneralContent =
-      phase1Response?.response?.SymptomAssessment ||
-      phase1Response?.response?.PossibleCauses ||
-      phase1Response?.response?.SelfCareGuidance;
-
     res.json({
       ok: true,
       result: {
         patientUid,
-        patientResponse: hasGeneralContent ? phase1Response : null,
+        patientResponse: null,
         summary,
         citedRecords,
         suggestions: suggestionsResult.suggestions || [],
