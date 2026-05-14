@@ -173,10 +173,27 @@ function PatientResultCard({ result }) {
     }
   };
 
+  if (result.agentMessage) {
+    return (
+      <Alert severity="info" sx={{ mb: 1 }}>
+        <strong>{result.name}:</strong> {result.agentMessage}
+      </Alert>
+    );
+  }
+
   if (result.error) {
     return (
       <Alert severity="error" sx={{ mb: 1 }}>
         <strong>{result.name}:</strong> {result.error}
+      </Alert>
+    );
+  }
+
+  const hasContent = result.summary || result.citedRecords?.length > 0 || result.suggestions?.length > 0;
+  if (!hasContent) {
+    return (
+      <Alert severity="info" sx={{ mb: 1 }}>
+        <strong>{result.name}:</strong> {"No relevant medical information found. Please ask a clinical question related to the patient's health records."}
       </Alert>
     );
   }
@@ -336,6 +353,7 @@ function PatientResultCard({ result }) {
 
 PatientResultCard.propTypes = {
   result: PropTypes.shape({
+    agentMessage: PropTypes.string,
     error: PropTypes.string,
     name: PropTypes.string,
     summary: PropTypes.string,

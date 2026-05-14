@@ -191,7 +191,7 @@ function SelfResultCard({ result }) {
   if (!hasContent) {
     return (
       <Alert severity="info" sx={{ mb: 1 }}>
-        No response could be generated. Please try rephrasing your question.
+        I can only help with medical and healthcare-related questions. Please ask about your symptoms, medications, health records, or general health guidance.
       </Alert>
     );
   }
