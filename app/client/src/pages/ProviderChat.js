@@ -493,17 +493,40 @@ function ProviderChat() {
     setQuery("");
     setLoading(true);
 
-    try {
-      const data = await aiService.queryPatients(trimmed, selectedPatients.map((p) => p.sub));
-      setMessages((prev) => [...prev, { role: "results", results: data.results }]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", text: "Error: " + (err.response?.data?.error || err.message), isError: true },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    // Fire one request per patient — append each result card as it resolves
+    const promises = selectedPatients.map((patient) =>
+      aiService.queryPatients(trimmed, [patient.sub])
+        .then((data) => {
+          const result = data.results?.[0];
+          if (result) {
+            setMessages((prev) => {
+              // Find existing results message for this query group, or append a new one
+              const last = prev[prev.length - 1];
+              if (last?.role === "results") {
+                return [...prev.slice(0, -1), { ...last, results: [...last.results, result] }];
+              }
+              return [...prev, { role: "results", results: [result] }];
+            });
+          }
+        })
+        .catch(() => {
+          setMessages((prev) => {
+            const errorResult = {
+              patientUid: patient.sub,
+              name: `${patient.firstName} ${patient.lastName}`,
+              error: `Failed to fetch results for ${patient.firstName} ${patient.lastName}.`,
+            };
+            const last = prev[prev.length - 1];
+            if (last?.role === "results") {
+              return [...prev.slice(0, -1), { ...last, results: [...last.results, errorResult] }];
+            }
+            return [...prev, { role: "results", results: [errorResult] }];
+          });
+        })
+    );
+
+    await Promise.allSettled(promises);
+    setLoading(false);
   };
 
   const handleKeyDown = (e) => {
