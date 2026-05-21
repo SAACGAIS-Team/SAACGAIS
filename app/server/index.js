@@ -24,7 +24,7 @@ const generalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development",
   message: { error: "Too many requests, please try again later." },
 });
 
@@ -33,7 +33,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req, res) => process.env.NODE_ENV === "test",
+  skip: () => process.env.NODE_ENV === "test" || process.env.NODE_ENV === "development",
   skipSuccessfulRequests: true,
   message: { error: "Too many attempts, please try again later." },
 });

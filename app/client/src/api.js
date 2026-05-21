@@ -1,12 +1,31 @@
 import { apiConfig } from "./apiConfig.js";
 
-// Helper to get CSRF token from the browser cookie
-const getCsrfToken = () => {
-  const cookie = document.cookie
-    .split("; ")
-    .find((c) => c.startsWith("XSRF-TOKEN="));
-  return cookie ? cookie.split("=")[1] : null;
-};
+let _csrfToken = null;
+let _initPromise = null;
+
+export function initializeApi() {
+  if (_initPromise) {
+    return _initPromise;
+  }
+  _initPromise = fetch(`${apiConfig.baseUrl}/auth/csrf-token`, {
+    credentials: "include",
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      _csrfToken = data.csrfToken;
+    })
+    .catch(() => {});
+  return _initPromise;
+}
+
+export async function refreshCsrfToken() {
+  _initPromise = null;
+  return initializeApi();
+}
+
+function getCsrfToken() {
+  return _csrfToken;
+}
 
 // ============================================
 // Fetch Helper — JSON
@@ -31,7 +50,6 @@ async function fetchWithAuth(endpoint, options = {}) {
 
   let response = await fetch(url, mergedOptions);
 
-  // If the access token has expired, attempt a silent refresh and retry once.
   if (response.status === 401) {
     const refreshRes = await fetch(`${apiConfig.baseUrl}/auth/refresh`, {
       method: "POST",
@@ -39,20 +57,15 @@ async function fetchWithAuth(endpoint, options = {}) {
     });
 
     if (refreshRes.ok) {
-      // Token refreshed — retry the original request with a fresh CSRF token.
-      const newToken = getCsrfToken();
       const retryOptions = {
         ...mergedOptions,
         headers: {
           ...mergedOptions.headers,
-          ...(newToken ? { "X-CSRF-Token": newToken } : {}),
+          ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken() } : {}),
         },
       };
       response = await fetch(url, retryOptions);
     } else {
-      // Refresh failed — session is truly expired. Fire an event so
-      // AuthContext can clear state before redirecting, rather than
-      // navigating directly and leaving React state stale.
       await fetch(`${apiConfig.baseUrl}/auth/logout`, {
         method: "POST",
         credentials: "include",
@@ -81,7 +94,6 @@ async function fetchWithAuth(endpoint, options = {}) {
 // ============================================
 async function fetchWithAuthFormData(endpoint, formData) {
   const url = `${apiConfig.baseUrlAPI}${endpoint}`;
-
   const token = getCsrfToken();
   const headers = token ? { "X-CSRF-Token": token } : {};
 
@@ -100,6 +112,28 @@ async function fetchWithAuthFormData(endpoint, formData) {
   }
 
   return data;
+}
+
+// ============================================
+// Fetch with Blob (file downloads)
+// ============================================
+async function fetchWithAuthBlob(endpoint) {
+  const url = `${apiConfig.baseUrlAPI}${endpoint}`;
+  const token = getCsrfToken();
+
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: token ? { "X-CSRF-Token": token } : {},
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    const error = new Error(data.error || "Download failed");
+    error.response = { status: response.status, data };
+    throw error;
+  }
+
+  return response.blob();
 }
 
 // ============================================
@@ -169,19 +203,7 @@ export const uploadService = {
   },
 
   downloadFile: async (id) => {
-    const url = `${apiConfig.baseUrlAPI}/upload/download/${id}`;
-    const token = getCsrfToken();
-    const response = await fetch(url, {
-      credentials: "include",
-      headers: token ? { "X-CSRF-Token": token } : {},
-    });
-    if (!response.ok) {
-      const data = await response.json();
-      const error = new Error(data.error || "Download failed");
-      error.response = { status: response.status, data };
-      throw error;
-    }
-    return response.blob();
+    return await fetchWithAuthBlob(`/upload/download/${id}`);
   },
 };
 

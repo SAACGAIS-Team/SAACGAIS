@@ -24,7 +24,7 @@ function SelectProvider() {
   };
 
   useEffect(() => {
-    if (isLoading) { setLoadingCurrentProvider(true); return; }
+    if (isLoading || !user?.sub) { setLoadingCurrentProvider(true); return; }
     const controller = new AbortController();
     const fetchProviders = async () => {
       try {
