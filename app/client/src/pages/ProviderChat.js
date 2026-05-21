@@ -17,6 +17,7 @@ import PropTypes from "prop-types";
 import { useAuth } from "../context/AuthContext.js";
 import { aiService, providerService, uploadService } from "../api.js";
 import PageCard from "../components/PageCard.js";
+import PrototypeBanner from "../components/PrototypeBanner.js";
 
 // ── Record View Dialog ────────────────────────────────────────────────────────
 function RecordViewDialog({ rec, onClose }) {
@@ -443,7 +444,7 @@ function ProviderChat() {
   const isProvider = userGroups.includes("Healthcare-Provider");
 
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Select patients from your panel and enter a clinical query. I'll analyze their records and provide a summary with suggestions." },
+    { role: "ai", text: "Select patients from your panel and enter a clinical query. I'll analyze their records and provide a summary with suggestions.\n\n🔬 This is a research prototype developed as part of an academic capstone project and is not intended for real clinical use. AI-generated suggestions should not replace professional clinical judgment." }
   ]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -535,6 +536,9 @@ function ProviderChat() {
         </Box>
       </Box>
 
+      {/* Research Prototype Disclaimer */}
+      <PrototypeBanner message="This application is a research prototype developed as part of an academic capstone project at Oregon State University. It is not intended for clinical use and is not HIPAA-certified. Security and privacy controls were designed following HIPAA guidelines as part of our research into securing AI agent communication. AI-generated suggestions should not replace professional clinical judgment." />
+
       {/* Messages */}
       <Box sx={{ flex: 1, overflowY: "auto", px: { xs: 2, sm: 4 }, py: 3, display: "flex", flexDirection: "column", gap: 2 }}>
         {messages.map((msg, i) => <MessageBubble key={i} msg={msg} userInitial={userInitial} />)}
@@ -619,7 +623,7 @@ function ProviderChat() {
           </Button>
         </Box>
         <Typography variant="caption" color="text.disabled" sx={{ pl: 2, mt: 0.5, display: "block" }}>
-          Press Enter to send
+          Press Enter to send · Research prototype only — not for clinical use
         </Typography>
       </Box>
     </Box>

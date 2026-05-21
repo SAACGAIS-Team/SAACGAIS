@@ -12,6 +12,7 @@ import { uploadService } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
 import PageCard from "../components/PageCard.js";
 import PropTypes from "prop-types";
+import PrototypeBanner from "../components/PrototypeBanner.js";
 
 const ALLOWED_EXTENSIONS = ".pdf,.txt,.md,.csv,.json,.xml,.html";
 const ALLOWED_LABEL = "PDF, TXT, MD, CSV, JSON, XML, HTML (max 10MB)";
@@ -315,6 +316,8 @@ export default function Upload() {
     });
 
   return (
+    <>
+    <PrototypeBanner message="This application is a research prototype developed as part of an academic capstone project at Oregon State University. Do not upload real medical records or personal health information. Use synthetic or fictional data only." />
     <PageCard>
       <Typography variant="h4" gutterBottom>Upload</Typography>
 
@@ -509,5 +512,6 @@ export default function Upload() {
         </Dialog>
       )}
     </PageCard>
+    </>
   );
 }
