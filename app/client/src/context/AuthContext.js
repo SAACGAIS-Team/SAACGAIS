@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { apiConfig } from "../apiConfig.js";
+import { refreshCsrfToken } from "../api.js";
 
 const AuthContext = createContext(null);
 const API = apiConfig.baseUrl;
@@ -64,7 +65,6 @@ export function AuthProvider({ children }) {
 
     const initialize = async () => {
       try {
-        await fetch(`${API}/auth/csrf-token`, { credentials: "include" });
         await fetchMe();
       } catch (err) {
         console.error("Initialization failed:", err);
@@ -160,6 +160,7 @@ export function AuthProvider({ children }) {
         method: "POST",
         credentials: "include"
       });
+      await refreshCsrfToken();
     } catch (err) {
       console.warn("Logout request failed:", err);
     } finally {
