@@ -13,13 +13,17 @@ import AccountSettings from "./pages/AccountSettings.js";
 import Login from "./pages/Login.js";
 import Signup from "./pages/Signup.js";
 import ErrorBoundary from "./components/ErrorBoundary.js";
+import DisclaimerModal, { useDisclaimerModal } from "./components/DisclaimerModal.js";
 
 function ProtectedRoute({ children, allowedGroups = [] }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (isLoading) return <div>Loading...</div>;
+
+  // Redirect to home if disclaimer hasn't been acknowledged yet
+  if (!sessionStorage.getItem("disclaimer_acknowledged")) {
+    return <Navigate to="/" replace />;
   }
 
   if (!isAuthenticated) {
@@ -42,10 +46,13 @@ ProtectedRoute.propTypes = {
 };
 
 function App() {
+  const { open, acknowledge } = useDisclaimerModal();
+
   return (
     <ErrorBoundary>
       <Router>
         <Navbar />
+        <DisclaimerModal open={open} onAcknowledge={acknowledge} />
 
         <Routes>
           <Route path="/" element={<Home />} />
