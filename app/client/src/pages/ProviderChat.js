@@ -17,6 +17,7 @@ import PropTypes from "prop-types";
 import { useAuth } from "../context/AuthContext.js";
 import { aiService, providerService, uploadService } from "../api.js";
 import PageCard from "../components/PageCard.js";
+import PrototypeBanner from "../components/PrototypeBanner.js";
 
 // ── Record View Dialog ────────────────────────────────────────────────────────
 function RecordViewDialog({ rec, onClose }) {
@@ -173,10 +174,27 @@ function PatientResultCard({ result }) {
     }
   };
 
+  if (result.agentMessage) {
+    return (
+      <Alert severity="info" sx={{ mb: 1 }}>
+        <strong>{result.name}:</strong> {result.agentMessage}
+      </Alert>
+    );
+  }
+
   if (result.error) {
     return (
       <Alert severity="error" sx={{ mb: 1 }}>
         <strong>{result.name}:</strong> {result.error}
+      </Alert>
+    );
+  }
+
+  const hasContent = result.summary || result.citedRecords?.length > 0 || result.suggestions?.length > 0;
+  if (!hasContent) {
+    return (
+      <Alert severity="info" sx={{ mb: 1 }}>
+        <strong>{result.name}:</strong> {"No relevant medical information found. Please ask a clinical question related to the patient's health records."}
       </Alert>
     );
   }
@@ -336,6 +354,7 @@ function PatientResultCard({ result }) {
 
 PatientResultCard.propTypes = {
   result: PropTypes.shape({
+    agentMessage: PropTypes.string,
     error: PropTypes.string,
     name: PropTypes.string,
     summary: PropTypes.string,
@@ -425,7 +444,7 @@ function ProviderChat() {
   const isProvider = userGroups.includes("Healthcare-Provider");
 
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Select patients from your panel and enter a clinical query. I'll analyze their records and provide a summary with suggestions." },
+    { role: "ai", text: "Select patients from your panel and enter a clinical query. I'll analyze their records and provide a summary with suggestions.\n\n🔬 This is a research prototype developed as part of an academic capstone project and is not intended for real clinical use. AI-generated suggestions should not replace professional clinical judgment." }
   ]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -474,17 +493,40 @@ function ProviderChat() {
     setQuery("");
     setLoading(true);
 
-    try {
-      const data = await aiService.queryPatients(trimmed, selectedPatients.map((p) => p.sub));
-      setMessages((prev) => [...prev, { role: "results", results: data.results }]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", text: "Error: " + (err.response?.data?.error || err.message), isError: true },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    // Fire one request per patient — append each result card as it resolves
+    const promises = selectedPatients.map((patient) =>
+      aiService.queryPatients(trimmed, [patient.sub])
+        .then((data) => {
+          const result = data.results?.[0];
+          if (result) {
+            setMessages((prev) => {
+              // Find existing results message for this query group, or append a new one
+              const last = prev[prev.length - 1];
+              if (last?.role === "results") {
+                return [...prev.slice(0, -1), { ...last, results: [...last.results, result] }];
+              }
+              return [...prev, { role: "results", results: [result] }];
+            });
+          }
+        })
+        .catch(() => {
+          setMessages((prev) => {
+            const errorResult = {
+              patientUid: patient.sub,
+              name: `${patient.firstName} ${patient.lastName}`,
+              error: `Failed to fetch results for ${patient.firstName} ${patient.lastName}.`,
+            };
+            const last = prev[prev.length - 1];
+            if (last?.role === "results") {
+              return [...prev.slice(0, -1), { ...last, results: [...last.results, errorResult] }];
+            }
+            return [...prev, { role: "results", results: [errorResult] }];
+          });
+        })
+    );
+
+    await Promise.allSettled(promises);
+    setLoading(false);
   };
 
   const handleKeyDown = (e) => {
@@ -516,6 +558,9 @@ function ProviderChat() {
           </Box>
         </Box>
       </Box>
+
+      {/* Research Prototype Disclaimer */}
+      <PrototypeBanner message="This application is a research prototype developed as part of an academic capstone project at Oregon State University. It is not intended for clinical use and is not HIPAA-certified. Security and privacy controls were designed following HIPAA guidelines as part of our research into securing AI agent communication. AI-generated suggestions should not replace professional clinical judgment." />
 
       {/* Messages */}
       <Box sx={{ flex: 1, overflowY: "auto", px: { xs: 2, sm: 4 }, py: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -601,7 +646,7 @@ function ProviderChat() {
           </Button>
         </Box>
         <Typography variant="caption" color="text.disabled" sx={{ pl: 2, mt: 0.5, display: "block" }}>
-          Press Enter to send
+          Press Enter to send · Research prototype only — not for clinical use
         </Typography>
       </Box>
     </Box>

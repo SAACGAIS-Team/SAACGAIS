@@ -17,7 +17,10 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/",
-  body("providerId").trim().notEmpty().withMessage("providerId is required").isUUID().withMessage("Invalid providerId format"),
+  body("providerId").trim()
+    .notEmpty().withMessage("providerId is required")
+    .matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+    .withMessage("Invalid providerId format"),
   handleValidation,
   async (req, res) => {
     const { providerId } = req.body;

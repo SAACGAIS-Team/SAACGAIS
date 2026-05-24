@@ -16,6 +16,7 @@ import PropTypes from "prop-types";
 import { useAuth } from "../context/AuthContext.js";
 import { aiService, uploadService } from "../api.js";
 import PageCard from "../components/PageCard.js";
+import PrototypeBanner from "../components/PrototypeBanner.js";
 
 // ── Record View Dialog ────────────────────────────────────────────────────────
 function RecordViewDialog({ rec, onClose }) {
@@ -191,7 +192,7 @@ function SelfResultCard({ result }) {
   if (!hasContent) {
     return (
       <Alert severity="info" sx={{ mb: 1 }}>
-        No response could be generated. Please try rephrasing your question.
+        I can only help with medical and healthcare-related questions. Please ask about your symptoms, medications, health records, or general health guidance.
       </Alert>
     );
   }
@@ -581,7 +582,7 @@ function PatientChat() {
   const isPatient = userGroups.includes("Patient");
 
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Ask me anything about your health records. I'll analyze your uploaded documents and provide a summary with suggestions." },
+    { role: "ai", text: "Ask me anything about your health records. I'll analyze your uploaded documents and provide a summary with suggestions.\n\n🔬 This is a research prototype developed as part of an academic capstone project and is not intended for real clinical use. Do not enter real personal health information." }
   ]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -603,10 +604,45 @@ function PatientChat() {
 
     // Build history from the last 6 messages before the one just sent,
     // excluding result cards which aren't text the agent can use
+    // Build history from the last 6 messages before the one just sent.
+    // Result cards are serialized into a text summary so Agent 3 has the
+    // full conversational context it needs to classify follow-up messages.
     const historyForAgent = updatedMessages
       .slice(-7, -1)
-      .filter((m) => m.role === "user" || m.role === "ai")
-      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", text: m.text }));
+      .flatMap((m) => {
+        if (m.role === "user") {
+          return [{ role: "user", text: m.text }];
+        }
+        if (m.role === "ai") {
+          return [{ role: "assistant", text: m.text }];
+        }
+        if (m.role === "result") {
+          const r = m.result;
+          if (!r || r.error) return [];
+          if (r.summary) {
+            const summaryText =
+              typeof r.summary === "string" ? r.summary : JSON.stringify(r.summary);
+            return [{
+              role: "assistant",
+              text: `I provided a clinical summary of your health records. Summary: ${summaryText.slice(0, 400)}`,
+            }];
+          }
+          if (r.patientResponse?.response) {
+            const resp = r.patientResponse.response;
+            const parts = [
+              resp.Acknowledgement,
+              resp.SymptomAssessment,
+              resp.SelfCareGuidance,
+              resp.RecommendedAction,
+              Array.isArray(resp.ResourcesProvided) ? resp.ResourcesProvided.join(" ") : null,
+            ].filter(Boolean);
+            const text = parts.join(" ").trim().slice(0, 500);
+            return text ? [{ role: "assistant", text }] : [];
+          }
+          return [];
+        }
+        return [];
+      });
 
     try {
       const data = await aiService.querySelf(trimmed, historyForAgent);
@@ -656,6 +692,9 @@ function PatientChat() {
           </Box>
         </Box>
       </Box>
+
+      {/* Research Prototype Disclaimer */}
+      <PrototypeBanner message="This application is a research prototype developed as part of an academic capstone project at Oregon State University. It is not intended for clinical use and is not HIPAA-certified. Security and privacy controls were designed following HIPAA guidelines as part of our research into securing AI agent communication." />
 
       {/* Messages */}
       <Box sx={{ flex: 1, overflowY: "auto", px: { xs: 2, sm: 4 }, py: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -709,7 +748,7 @@ function PatientChat() {
           </Button>
         </Box>
         <Typography variant="caption" color="text.disabled" sx={{ pl: 2, mt: 0.5, display: "block" }}>
-          Press Enter to send
+          Press Enter to send · Research prototype only — not for clinical use
         </Typography>
       </Box>
     </Box>

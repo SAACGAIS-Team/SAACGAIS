@@ -12,6 +12,7 @@ import { uploadService } from "../api.js";
 import { useAuth } from "../context/AuthContext.js";
 import PageCard from "../components/PageCard.js";
 import PropTypes from "prop-types";
+import PrototypeBanner from "../components/PrototypeBanner.js";
 
 const ALLOWED_EXTENSIONS = ".pdf,.txt,.md,.csv,.json,.xml,.html";
 const ALLOWED_LABEL = "PDF, TXT, MD, CSV, JSON, XML, HTML (max 10MB)";
@@ -315,199 +316,202 @@ export default function Upload() {
     });
 
   return (
-    <PageCard>
-      <Typography variant="h4" gutterBottom>Upload</Typography>
+    <>
+      <PrototypeBanner message="This application is a research prototype developed as part of an academic capstone project at Oregon State University. Do not upload real medical records or personal health information. Use synthetic or fictional data only." />
+      <PageCard>
+        <Typography variant="h4" gutterBottom>Upload</Typography>
 
-      <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
 
-        {/* ── File Upload Section ─────────────────────────────────────── */}
-        <Box sx={{ flex: 1, minWidth: 300 }}>
-          <Typography variant="h6" gutterBottom>File Upload</Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-            Allowed: {ALLOWED_LABEL}
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, mb: 2 }}>
-            <input
-              type="file" id="file-upload" multiple
-              accept={ALLOWED_EXTENSIONS} style={{ display: "none" }}
-              onChange={handleFileSelect}
-            />
-            <label htmlFor="file-upload">
-              <Button variant="outlined" component="span">Choose Files</Button>
-            </label>
-            <Button
-              variant="contained" onClick={handleFileUpload}
-              disabled={fileLoading || selectedFiles.length === 0}
-            >
-              {fileLoading ? <CircularProgress size={24} color="inherit" /> : "Upload Files"}
-            </Button>
+          {/* ── File Upload Section ─────────────────────────────────────── */}
+          <Box sx={{ flex: 1, minWidth: 300 }}>
+            <Typography variant="h6" gutterBottom>File Upload</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              Allowed: {ALLOWED_LABEL}
+            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, mb: 2 }}>
+              <input
+                type="file" id="file-upload" multiple
+                accept={ALLOWED_EXTENSIONS} style={{ display: "none" }}
+                onChange={handleFileSelect}
+              />
+              <label htmlFor="file-upload">
+                <Button variant="outlined" component="span">Choose Files</Button>
+              </label>
+              <Button
+                variant="contained" onClick={handleFileUpload}
+                disabled={fileLoading || selectedFiles.length === 0}
+              >
+                {fileLoading ? <CircularProgress size={24} color="inherit" /> : "Upload Files"}
+              </Button>
+            </Box>
+
+            {selectedFiles.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                {selectedFiles.map((file, i) => (
+                  <Chip key={i} label={file.name} onDelete={() => handleRemoveFile(i)} sx={{ mr: 0.5, mb: 0.5 }} />
+                ))}
+              </Box>
+            )}
+
+            {fileMessage && (
+              <Alert severity={fileMessage.type} sx={{ mb: 2 }} onClose={() => setFileMessage(null)}>
+                {fileMessage.text}
+              </Alert>
+            )}
+
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="subtitle1" gutterBottom>File History</Typography>
+            {loadingHistory ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={24} /></Box>
+            ) : fileHistory.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
+            ) : (
+              <List dense>
+                {fileHistory.map((f) => (
+                  <ListItem
+                    key={f.File_Upload_ID}
+                    disableGutters
+                    secondaryAction={
+                      <Stack direction="row" spacing={0}>
+                        <Tooltip title="View">
+                          <IconButton edge="end" onClick={() => handleViewFile(f)}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Download">
+                          <IconButton
+                            edge="end"
+                            onClick={() => handleDownload(f.File_Upload_ID, f.File_Name)}
+                            disabled={downloadingKey === f.File_Upload_ID}
+                          >
+                            {downloadingKey === f.File_Upload_ID
+                              ? <CircularProgress size={18} />
+                              : <DownloadIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            edge="end"
+                            color="error"
+                            onClick={() => handleDeleteConfirm("file", f.File_Upload_ID, f.File_Name)}
+                            disabled={deletingId === f.File_Upload_ID}
+                          >
+                            {deletingId === f.File_Upload_ID
+                              ? <CircularProgress size={18} />
+                              : <DeleteIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    }
+                  >
+                    <ListItemText primary={f.File_Name} secondary={formatDate(f.Upload_Time)} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
           </Box>
 
-          {selectedFiles.length > 0 && (
-            <Box sx={{ mb: 2 }}>
-              {selectedFiles.map((file, i) => (
-                <Chip key={i} label={file.name} onDelete={() => handleRemoveFile(i)} sx={{ mr: 0.5, mb: 0.5 }} />
-              ))}
-            </Box>
-          )}
-
-          {fileMessage && (
-            <Alert severity={fileMessage.type} sx={{ mb: 2 }} onClose={() => setFileMessage(null)}>
-              {fileMessage.text}
-            </Alert>
-          )}
-
-          <Divider sx={{ mb: 2 }} />
-          <Typography variant="subtitle1" gutterBottom>File History</Typography>
-          {loadingHistory ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={24} /></Box>
-          ) : fileHistory.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
-          ) : (
-            <List dense>
-              {fileHistory.map((f) => (
-                <ListItem
-                  key={f.File_Upload_ID}
-                  disableGutters
-                  secondaryAction={
-                    <Stack direction="row" spacing={0}>
-                      <Tooltip title="View">
-                        <IconButton edge="end" onClick={() => handleViewFile(f)}>
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Download">
-                        <IconButton
-                          edge="end"
-                          onClick={() => handleDownload(f.File_Upload_ID, f.File_Name)}
-                          disabled={downloadingKey === f.File_Upload_ID}
-                        >
-                          {downloadingKey === f.File_Upload_ID
-                            ? <CircularProgress size={18} />
-                            : <DownloadIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          edge="end"
-                          color="error"
-                          onClick={() => handleDeleteConfirm("file", f.File_Upload_ID, f.File_Name)}
-                          disabled={deletingId === f.File_Upload_ID}
-                        >
-                          {deletingId === f.File_Upload_ID
-                            ? <CircularProgress size={18} />
-                            : <DeleteIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  }
-                >
-                  <ListItemText primary={f.File_Name} secondary={formatDate(f.Upload_Time)} />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Box>
-
-        {/* ── Text Upload Section ─────────────────────────────────────── */}
-        <Box sx={{ flex: 1, minWidth: 300 }}>
-          <Typography variant="h6" gutterBottom>Text Upload</Typography>
-          <TextField
-            label="Enter text" multiline minRows={6} maxRows={12}
-            variant="outlined" fullWidth value={text}
-            onChange={(e) => setText(e.target.value)} sx={{ mb: 2 }}
-          />
-          {textMessage && (
-            <Alert severity={textMessage.type} sx={{ mb: 2 }} onClose={() => setTextMessage(null)}>
-              {textMessage.text}
-            </Alert>
-          )}
-          <Button
-            variant="contained" onClick={handleTextUpload}
-            disabled={textLoading || !text.trim()} sx={{ mb: 3 }}
-          >
-            {textLoading ? <CircularProgress size={24} color="inherit" /> : "Save Text"}
-          </Button>
-
-          <Divider sx={{ mb: 2 }} />
-          <Typography variant="subtitle1" gutterBottom>Text History</Typography>
-          {loadingHistory ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={24} /></Box>
-          ) : textHistory.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">No text uploaded yet.</Typography>
-          ) : (
-            <List dense>
-              {textHistory.map((t) => (
-                <ListItem
-                  key={t.Text_Upload_ID}
-                  disableGutters
-                  secondaryAction={
-                    <Stack direction="row" spacing={0}>
-                      <Tooltip title="View">
-                        <IconButton edge="end" onClick={() => handleViewText(t)}>
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          edge="end"
-                          color="error"
-                          onClick={() => handleDeleteConfirm(
-                            "text",
-                            t.Text_Upload_ID,
-                            t.Text_Content.slice(0, 40) + (t.Text_Content.length > 40 ? "…" : "")
-                          )}
-                          disabled={deletingId === t.Text_Upload_ID}
-                        >
-                          {deletingId === t.Text_Upload_ID
-                            ? <CircularProgress size={18} />
-                            : <DeleteIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  }
-                >
-                  <ListItemText
-                    primary={t.Text_Content.length > 80 ? t.Text_Content.slice(0, 80) + "…" : t.Text_Content}
-                    secondary={formatDate(t.Upload_Time)}
-                    slotProps={{ primary: { noWrap: true, sx: { maxWidth: 220 } } }}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Box>
-      </Box>
-
-      {/* ── Dialogs ─────────────────────────────────────────────────── */}
-      {viewTextDialog && (
-        <TextViewDialog item={viewTextDialog} onClose={() => setViewTextDialog(null)} />
-      )}
-      {viewFileDialog && (
-        <FileViewDialog
-          item={viewFileDialog}
-          onClose={handleCloseFileDialog}
-          onDownload={() => handleDownload(viewFileDialog.id, viewFileDialog.fileName)}
-          downloading={downloadingKey === viewFileDialog.id}
-        />
-      )}
-      {confirmDelete && (
-        <Dialog open onClose={() => setConfirmDelete(null)} maxWidth="xs" fullWidth>
-          <DialogTitle>Confirm Delete</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to permanently delete{" "}
-              <strong>{confirmDelete.label}</strong>? This cannot be undone.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
-            <Button variant="contained" color="error" onClick={handleDeleteExecute}>
-              Delete
+          {/* ── Text Upload Section ─────────────────────────────────────── */}
+          <Box sx={{ flex: 1, minWidth: 300 }}>
+            <Typography variant="h6" gutterBottom>Text Upload</Typography>
+            <TextField
+              label="Enter text" multiline minRows={6} maxRows={12}
+              variant="outlined" fullWidth value={text}
+              onChange={(e) => setText(e.target.value)} sx={{ mb: 2 }}
+            />
+            {textMessage && (
+              <Alert severity={textMessage.type} sx={{ mb: 2 }} onClose={() => setTextMessage(null)}>
+                {textMessage.text}
+              </Alert>
+            )}
+            <Button
+              variant="contained" onClick={handleTextUpload}
+              disabled={textLoading || !text.trim()} sx={{ mb: 3 }}
+            >
+              {textLoading ? <CircularProgress size={24} color="inherit" /> : "Save Text"}
             </Button>
-          </DialogActions>
-        </Dialog>
-      )}
-    </PageCard>
+
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="subtitle1" gutterBottom>Text History</Typography>
+            {loadingHistory ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={24} /></Box>
+            ) : textHistory.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No text uploaded yet.</Typography>
+            ) : (
+              <List dense>
+                {textHistory.map((t) => (
+                  <ListItem
+                    key={t.Text_Upload_ID}
+                    disableGutters
+                    secondaryAction={
+                      <Stack direction="row" spacing={0}>
+                        <Tooltip title="View">
+                          <IconButton edge="end" onClick={() => handleViewText(t)}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            edge="end"
+                            color="error"
+                            onClick={() => handleDeleteConfirm(
+                              "text",
+                              t.Text_Upload_ID,
+                              t.Text_Content.slice(0, 40) + (t.Text_Content.length > 40 ? "…" : "")
+                            )}
+                            disabled={deletingId === t.Text_Upload_ID}
+                          >
+                            {deletingId === t.Text_Upload_ID
+                              ? <CircularProgress size={18} />
+                              : <DeleteIcon fontSize="small" />}
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    }
+                  >
+                    <ListItemText
+                      primary={t.Text_Content.length > 80 ? t.Text_Content.slice(0, 80) + "…" : t.Text_Content}
+                      secondary={formatDate(t.Upload_Time)}
+                      slotProps={{ primary: { noWrap: true, sx: { maxWidth: 220 } } }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Box>
+        </Box>
+
+        {/* ── Dialogs ─────────────────────────────────────────────────── */}
+        {viewTextDialog && (
+          <TextViewDialog item={viewTextDialog} onClose={() => setViewTextDialog(null)} />
+        )}
+        {viewFileDialog && (
+          <FileViewDialog
+            item={viewFileDialog}
+            onClose={handleCloseFileDialog}
+            onDownload={() => handleDownload(viewFileDialog.id, viewFileDialog.fileName)}
+            downloading={downloadingKey === viewFileDialog.id}
+          />
+        )}
+        {confirmDelete && (
+          <Dialog open onClose={() => setConfirmDelete(null)} maxWidth="xs" fullWidth>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Are you sure you want to permanently delete{" "}
+                <strong>{confirmDelete.label}</strong>? This cannot be undone.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
+              <Button variant="contained" color="error" onClick={handleDeleteExecute}>
+                Delete
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </PageCard>
+    </>
   );
 }
