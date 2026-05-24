@@ -1,4 +1,4 @@
-export default function authzContext(action, resource, getTarget = () => null) {
+export default function authzContext(action, resource, getTarget = () => ({})) {
   return function (req, res, next) {
     if (!req.user) {
       return res.status(401).json({ error: "Unauthenticated" });
@@ -7,11 +7,11 @@ export default function authzContext(action, resource, getTarget = () => null) {
     req.authz = {
       identity: {
         sub: req.user.sub,
-        roles: req.user.roles,
+        roles: req.user.roles ?? [],
       },
       action,
       resource,
-      target: getTarget(req),
+      target: getTarget(req) ?? {},
     };
 
     next();

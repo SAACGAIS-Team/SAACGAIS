@@ -1,6 +1,8 @@
 import express from "express";
 import * as cognito from "../services/cognitoService.js";
 import logger from "../services/logger.js";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
 
@@ -15,7 +17,10 @@ function applySearch(users, search) {
 }
 
 // GET /api/search-users?role=&search=
-router.get("/", async (req, res) => {
+router.get("/",
+  authzContext("search_users", "user_directory"),
+  authorize(),
+  async (req, res) => {
   const { role, search } = req.query;
   try {
     const users = role ? await cognito.listUsersInGroup(role) : await cognito.listAllUsers();
@@ -27,7 +32,10 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/search-users/:userId
-router.get("/:userId", async (req, res) => {
+router.get("/:userId",
+  authzContext("search_users", "user_directory"),
+  authorize(),
+  async (req, res) => {
   try {
     const user = await cognito.getUserById(req.params.userId);
     return res.json(user);

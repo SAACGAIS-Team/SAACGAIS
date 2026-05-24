@@ -3,6 +3,8 @@ import { body } from "express-validator";
 import * as cognito from "../services/cognitoService.js";
 import { handleValidation } from "../middleware/validate.js";
 import logger from "../services/logger.js";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
 
@@ -11,6 +13,8 @@ router.put("/attributes",
   body("given_name").trim().notEmpty().withMessage("First name is required").isLength({ max: 50 }).withMessage("First name too long").escape(),
   body("family_name").trim().notEmpty().withMessage("Last name is required").isLength({ max: 50 }).withMessage("Last name too long").escape(),
   handleValidation,
+  authzContext("update_own_settings", "user_settings", (req) => ({ userId: req.user?.sub })),
+  authorize(),
   async (req, res) => {
     const { given_name, family_name } = req.body;
     const userId = req.user.sub;
@@ -32,6 +36,8 @@ router.put("/password",
   body("currentPassword").notEmpty().withMessage("Current password is required"),
   body("newPassword").isLength({ min: 8 }).withMessage("Password must be at least 8 characters").isLength({ max: 128 }).withMessage("Password too long"),
   handleValidation,
+  authzContext("update_own_password", "user_settings", (req) => ({ userId: req.user?.sub })),
+  authorize(),
   async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.sub;

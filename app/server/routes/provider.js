@@ -3,10 +3,16 @@ import express from "express";
 import { body } from "express-validator";
 import { handleValidation } from "../middleware/validate.js";
 import logger from "../services/logger.js";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/",
+  authzContext("read_provider_selection", "provider_relationship",
+    (req) => ({ patientUid: req.user?.sub })),
+  authorize(),
+  async (req, res) => {
   try {
     const data = await db.getProviderSelection(req.user.sub);
     res.json({ ok: true, data });
@@ -19,6 +25,9 @@ router.get("/", async (req, res) => {
 router.post("/",
   body("providerId").trim().notEmpty().withMessage("providerId is required").isUUID().withMessage("Invalid providerId format"),
   handleValidation,
+  authzContext("select_provider", "provider_relationship",
+    (req) => ({ patientUid: req.user?.sub })),
+  authorize(),
   async (req, res) => {
     const { providerId } = req.body;
     try {
@@ -32,11 +41,10 @@ router.post("/",
   }
 );
 
-router.get("/patients", async (req, res) => {
-  const userRoles = req.user.roles || [];
-  if (!userRoles.includes("Healthcare-Provider")) {
-    return res.status(403).json({ error: "Only providers can access this endpoint" });
-  }
+router.get("/patients",
+  authzContext("list_patients", "phi_metadata"),
+  authorize(),
+  async (req, res) => {
   try {
     const patients = await db.getProviderPatients(req.user.sub);
     res.json({ ok: true, patients });

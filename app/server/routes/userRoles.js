@@ -3,12 +3,17 @@ import { body, param } from "express-validator";
 import * as cognito from "../services/cognitoService.js";
 import { handleValidation } from "../middleware/validate.js";
 import logger from "../services/logger.js";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
 
 const router = express.Router();
 
 const VALID_ROLES = ["Patient", "Healthcare-Provider", "Administrator"];
 
-router.get("/", async (req, res) => {
+router.get("/",
+  authzContext("read_roles", "role_management"),
+  authorize(),
+  async (req, res) => {
   try {
     const groups = await cognito.listGroups();
     const roles = groups.map((g) => ({
@@ -27,6 +32,9 @@ router.get("/", async (req, res) => {
 router.get("/:userId",
   param("userId").trim().notEmpty().withMessage("userId is required"),
   handleValidation,
+  authzContext("read_user_roles", "role_management",
+    (req) => ({ userId: req.params.userId })),
+  authorize(),
   async (req, res) => {
     try {
       const roles = await cognito.getUserGroups(req.params.userId);
@@ -46,6 +54,8 @@ router.post("/",
   body("newRoles").isArray({ min: 1 }).withMessage("newRoles must be a non-empty array"),
   body("newRoles.*").isIn(VALID_ROLES).withMessage(`Each role must be one of: ${VALID_ROLES.join(", ")}`),
   handleValidation,
+  authzContext("assign_role", "role_management"),
+  authorize(),
   async (req, res) => {
     const { targetUserId, newRoles } = req.body;
     try {

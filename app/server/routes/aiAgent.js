@@ -4,6 +4,9 @@ import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-b
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import * as db from "../services/supabaseService.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
+import auditLog from "../middleware/auditLog.js";
 
 const router = express.Router();
 
@@ -160,7 +163,12 @@ async function fetchPatientRecords(patientUid) {
 // POST /api/ai/query
 // Body: { query: string, patientIds: string[] }
 // ============================================
-router.post("/query", async (req, res) => {
+router.post("/query",
+  authzContext("ai_query_provider", "phi_records",
+    (req) => ({ patientIds: req.body?.patientIds ?? [], query: req.body?.query ?? "" })),
+  auditLog("ai_query_provider", (req) => req.body?.patientIds ?? []),
+  authorize(),
+  async (req, res) => {
   const providerUid = req.user.sub;
   const userRoles = req.user.roles || [];
   const { query, patientIds } = req.body;
@@ -282,7 +290,12 @@ router.post("/query", async (req, res) => {
 // POST /api/ai/patient-self-query
 // Body: { query: string }
 // ============================================
-router.post("/patient-self-query", async (req, res) => {
+router.post("/patient-self-query",
+  authzContext("ai_query_patient", "phi_records",
+    (req) => ({ patientUid: req.user?.sub })),
+  auditLog("ai_query_patient", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   const patientUid = req.user.sub;
   const userRoles = req.user.roles || [];
   const { query, conversationHistory = [] } = req.body;

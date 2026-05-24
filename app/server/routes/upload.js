@@ -6,6 +6,9 @@ import { body } from "express-validator";
 import { handleValidation } from "../middleware/validate.js";
 import * as db from "../services/supabaseService.js";
 import logger from "../services/logger.js";
+import authzContext from "../middleware/authzContext.js";
+import authorize from "../middleware/authorize.js";
+import auditLog from "../middleware/auditLog.js";
 
 const router = express.Router();
 
@@ -43,14 +46,19 @@ const s3 = new S3Client({
 });
 
 // POST /api/upload/file
-router.post("/file", (req, res, next) => {
-  upload.array("files")(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({ error: err.message }); // safe — multer validation message
-    }
-    next();
-  });
-}, async (req, res) => {
+router.post("/file",
+  (req, res, next) => {
+    upload.array("files")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ error: err.message }); // safe — multer validation message
+      }
+      next();
+    });
+  },
+  authzContext("upload_record", "phi_records", (req) => ({ patientUid: req.user?.sub })),
+  auditLog("upload_record", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   try {
     const patientId = req.user.sub;
     const files = req.files;
@@ -85,6 +93,9 @@ router.post("/file", (req, res, next) => {
 router.post("/text",
   body("text").trim().notEmpty().withMessage("Text content is required").isLength({ max: 50000 }).withMessage("Text content exceeds maximum length"),
   handleValidation,
+  authzContext("upload_record", "phi_records", (req) => ({ patientUid: req.user?.sub })),
+  auditLog("upload_record", (req) => [req.user?.sub]),
+  authorize(),
   async (req, res) => {
     const patientId = req.user.sub;
     const { text } = req.body;
@@ -99,7 +110,11 @@ router.post("/text",
 );
 
 // GET /api/upload/file
-router.get("/file", async (req, res) => {
+router.get("/file",
+  authzContext("list_own_records", "phi_records", (req) => ({ patientUid: req.user?.sub })),
+  auditLog("list_own_records", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   try {
     const data = await db.getFileUploads(req.user.sub);
     res.json({ ok: true, uploads: data });
@@ -110,7 +125,11 @@ router.get("/file", async (req, res) => {
 });
 
 // GET /api/upload/text
-router.get("/text", async (req, res) => {
+router.get("/text",
+  authzContext("list_own_records", "phi_records", (req) => ({ patientUid: req.user?.sub })),
+  auditLog("list_own_records", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   try {
     const data = await db.getTextUploads(req.user.sub);
     res.json({ ok: true, uploads: data });
@@ -121,7 +140,11 @@ router.get("/text", async (req, res) => {
 });
 
 // GET /api/upload/text/:id
-router.get("/text/:id", async (req, res) => {
+router.get("/text/:id",
+  authzContext("read_record", "phi_records"),
+  auditLog("read_record", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   const requesterId = req.user.sub;
   const { id } = req.params;
 
@@ -140,7 +163,11 @@ router.get("/text/:id", async (req, res) => {
 });
 
 // GET /api/upload/download/:id
-router.get("/download/:id", async (req, res) => {
+router.get("/download/:id",
+  authzContext("download_record", "phi_records"),
+  auditLog("download_record", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   const requesterId = req.user.sub;
   const { id } = req.params;
 
@@ -163,7 +190,11 @@ router.get("/download/:id", async (req, res) => {
 });
 
 // DELETE /api/upload/file/:id
-router.delete("/file/:id", async (req, res) => {
+router.delete("/file/:id",
+  authzContext("delete_record", "phi_records", (req) => ({ patientUid: req.user?.sub })),
+  auditLog("delete_record", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   const patientId = req.user.sub;
   const { id } = req.params;
 
@@ -185,7 +216,11 @@ router.delete("/file/:id", async (req, res) => {
 });
 
 // DELETE /api/upload/text/:id
-router.delete("/text/:id", async (req, res) => {
+router.delete("/text/:id",
+  authzContext("delete_record", "phi_records", (req) => ({ patientUid: req.user?.sub })),
+  auditLog("delete_record", (req) => [req.user?.sub]),
+  authorize(),
+  async (req, res) => {
   const patientId = req.user.sub;
   const { id } = req.params;
 
